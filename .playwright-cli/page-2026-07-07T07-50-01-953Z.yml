@@ -1,0 +1,94 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - paragraph [ref=e5]: EXPEDICIÓN Nº7
+    - heading "ACUARIO ABISAL" [level=1] [ref=e6]:
+      - text: ACUARIO
+      - emphasis [ref=e7]: ABISAL
+    - paragraph [ref=e8]: CRIATURAS REALES · & · FICTICIAS
+    - generic [ref=e9]:
+      - button "✦ DESCUBRIMIENTO Observa, fotografía y completa el álbum. Las especies llegan solas — y algunas tienen sus condiciones. NUEVA EXPEDICIÓN" [ref=e10] [cursor=pointer]:
+        - generic [ref=e11]: ✦ DESCUBRIMIENTO
+        - generic [ref=e12]: Observa, fotografía y completa el álbum. Las especies llegan solas — y algunas tienen sus condiciones.
+        - generic [ref=e13]: NUEVA EXPEDICIÓN
+      - 'button "◉ ACUARIO Tu pecera libre: solo las especies ya descubiertas, las que tú elijas. Sin retos; la cámara queda de recuerdo. AÚN SIN ESPECIES — DESCUBRE PRIMERO" [ref=e14] [cursor=pointer]':
+        - generic [ref=e15]: ◉ ACUARIO
+        - generic [ref=e16]: "Tu pecera libre: solo las especies ya descubiertas, las que tú elijas. Sin retos; la cámara queda de recuerdo."
+        - generic [ref=e17]: AÚN SIN ESPECIES — DESCUBRE PRIMERO
+    - button "reiniciar expedición" [ref=e18] [cursor=pointer]
+  - banner:
+    - generic [ref=e19]:
+      - button "Volver al inicio" [ref=e20] [cursor=pointer]: ⌂ INICIO
+      - button "Abrir bitácora" [ref=e21] [cursor=pointer]: ☰ BITÁCORA
+      - button "Abrir álbum" [ref=e22] [cursor=pointer]: ✦ ÁLBUM 0/39
+      - button "Modo cámara" [ref=e23] [cursor=pointer]: ◉ CÁMARA C
+      - button "Silenciar sonido" [ref=e24] [cursor=pointer]: ♪ SONIDO
+    - generic [ref=e25]:
+      - heading "ACUARIO ABISAL" [level=1] [ref=e26]:
+        - text: ACUARIO
+        - emphasis [ref=e27]: ABISAL
+      - paragraph [ref=e28]: CRIATURAS REALES · & · FICTICIAS
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: PROFUNDIDAD
+        - text: −38,0 m
+      - generic [ref=e32]:
+        - button "Ascender de ecosistema" [disabled] [ref=e33]: ◂
+        - generic [ref=e34]: EL ARRECIFE
+        - button "Descender de ecosistema" [disabled] [ref=e35]: ▸
+  - generic:
+    - generic: DESCENDIENDO
+    - generic: —
+  - text: ●
+  - complementary [ref=e36]:
+    - generic [ref=e37]:
+      - heading [level=2] [ref=e38]: Bitácora de expedición
+      - button [ref=e39] [cursor=pointer]: ×
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]: ESPECIES REALES
+        - generic [ref=e45]: "???"
+        - generic [ref=e48]: "???"
+        - generic [ref=e51]: "???"
+        - generic [ref=e54]: "???"
+        - generic [ref=e57]: "???"
+        - generic [ref=e60]: "???"
+        - generic [ref=e63]: "???"
+        - generic [ref=e66]: "???"
+        - generic [ref=e69]: "???"
+        - generic [ref=e72]: "???"
+        - generic [ref=e75]: "???"
+        - generic [ref=e78]: "???"
+        - generic [ref=e81]: "???"
+        - generic [ref=e82]: ESPECIES FICTICIAS
+        - generic [ref=e85]: "???"
+        - generic [ref=e88]: "???"
+        - generic [ref=e91]: "???"
+        - generic [ref=e94]: "???"
+        - generic [ref=e95]: EXPEDICIÓN
+        - generic [ref=e98]: "???"
+      - generic [ref=e99]: AMBIENTE
+      - generic [ref=e100]:
+        - generic [ref=e101]: Modo abisal
+        - checkbox [ref=e103] [cursor=pointer]
+    - generic [ref=e105]:
+      - generic [ref=e106]: "POBLACIÓN: 25"
+      - generic [ref=e107]: EXPEDICIÓN Nº7 · v0.8
+  - generic:
+    - generic: CEBO
+    - button "✺ PLANCTON 1":
+      - generic: ✺
+      - text: PLANCTON
+      - generic: "1"
+    - button "● PELLETS 2":
+      - generic: ●
+      - text: PELLETS
+      - generic: "2"
+    - button "◆ CARNADA 3":
+      - generic: ◆
+      - text: CARNADA
+      - generic: "3"
+    - button "✦ LUZ 4":
+      - generic: ✦
+      - text: LUZ
+      - generic: "4"
+  - generic: Observa las criaturas para registrarlas · pulsa C y fotografíalas · toca el agua para dar de comer
