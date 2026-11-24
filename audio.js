@@ -188,6 +188,10 @@ const audio = (() => {
       case 'bite':
         thump(90, 0.18, 0.25);
         break;
+      case 'retumbo': // el mero: grave y blando, se siente más que se oye
+        thump(82, 0.16, 1.1);
+        thump(54, 0.12, 1.6);
+        break;
       case 'geiser':
         hiss(0.14, 1.1, 500, 'lowpass');
         thump(45, 0.12, 0.9);

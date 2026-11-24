@@ -1,12 +1,17 @@
 /* ============================================================
-   ACUARIO ABISAL — mundo, atmósfera, bucle e interfaz
-   Requiere creatures.js cargado antes.
+   ACUARIO ABISAL — mundo, partículas, bucle e interfaz
+   El paisaje lo pintan agua.js y entorno.js. Cargar el último.
    ============================================================ */
 'use strict';
 
+// textos al idioma elegido antes de construir ninguna interfaz
+idioma.aplicar();
+
 const canvas = document.getElementById('sea');
 const ctx = canvas.getContext('2d');
-let DPR = Math.min(window.devicePixelRatio || 1, 2);
+// si el equipo no llega a 60, se cede resolución antes que suavidad
+const densidad = () => Math.min(window.devicePixelRatio || 1, luz.calidad === 2 ? 2 : 1.35);
+let DPR = densidad();
 
 /* bioma activo — declarado antes que resize(), que ya lo consulta */
 if (!BIOMES[save.biome]) save.biome = 'arrecife';
@@ -26,19 +31,15 @@ const KELP = [
   { fx: 0.94, h: 150, phase: 5.2 },
 ];
 const KELP_FRONT = { fx: 0.38, h: 130, phase: 2.3 };
-const RAYS = [
-  { fx: 0.18, w: 60, phase: 0.0 },
-  { fx: 0.38, w: 90, phase: 1.9 },
-  { fx: 0.57, w: 55, phase: 3.4 },
-  { fx: 0.76, w: 100, phase: 5.0 },
-];
 const VENT = { fx: 0.63, next: 0 };
 
 world.floorY = x => world.H - 58 + Math.sin(x * 0.012) * 5 + Math.sin(x * 0.027 + 2) * 4;
 
 const snow = [];
+const motas = [];
 function seedSnow() {
   snow.length = 0;
+  motas.length = 0;
   const n = Math.floor((world.W * world.H) / 26000 * (biomeDef.snowMul || 1));
   for (let i = 0; i < n; i++) {
     snow.push({
@@ -47,17 +48,16 @@ function seedSnow() {
       drift: rand(TAU), far: Math.random() < 0.5,
     });
   }
+  // unas pocas motas muy cerca del ojo, desenfocadas
+  for (let i = 0; i < Math.ceil(world.W / 220); i++) {
+    motas.push({ fx: i * 0.618 % 1, fy: i * 0.377 % 1, r: 7 + (i * 5) % 11 });
+  }
 }
 
 function resize() {
   world.W = window.innerWidth;
   world.H = window.innerHeight;
-  DPR = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = world.W * DPR;
-  canvas.height = world.H * DPR;
-  canvas.style.width = world.W + 'px';
-  canvas.style.height = world.H + 'px';
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ajustarLienzo();
   seedSnow();
   const ax = ROCKS[0].fx * world.W;
   world.anemone = { x: ax + 46, y: world.floorY(ax + 46) - 18 };
@@ -77,6 +77,15 @@ function resize() {
     if (c.baseY !== undefined) c.baseY = clamp(c.baseY, world.H * 0.28, world.H * 0.68);
   }
 }
+function ajustarLienzo() {
+  DPR = densidad();
+  canvas.width = world.W * DPR;
+  canvas.height = world.H * DPR;
+  canvas.style.width = world.W + 'px';
+  canvas.style.height = world.H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  entorno.invalidar();
+}
 window.addEventListener('resize', resize);
 resize();
 
@@ -94,295 +103,31 @@ let mouseIdle = 0; // segundos sin mover el ratón (lo vigila el espectro)
 
 /* ---------- colores de fondo (bioma actual → abisal) ---------- */
 const DARK = {
-  top: [3, 18, 30], mid: [2, 11, 20], bottom: [0, 3, 8],
-  sand: [16, 28, 40], sandLo: [8, 16, 26],
+  top: [4, 22, 42], mid: [2, 12, 27], bottom: [1, 4, 12],
+  luz: [100, 170, 240], velo: [40, 70, 140],
 };
 
-function mixCol(pair, t) {
-  const [a, b] = pair;
-  return `rgb(${Math.round(lerp(a[0], b[0], t))}, ${Math.round(lerp(a[1], b[1], t))}, ${Math.round(lerp(a[2], b[2], t))})`;
-}
-function bgMix(name, t) {
-  return mixCol([biomeDef.bg[name], DARK[name]], t);
-}
-
 /* ============================================================
-   DIBUJO DEL ENTORNO
+   NIEVE MARINA — tres distancias
    ============================================================ */
-function drawBackground() {
-  const t = world.abyssMix;
-  const g = ctx.createLinearGradient(0, 0, 0, world.H);
-  g.addColorStop(0, bgMix('top', t));
-  g.addColorStop(0.55, bgMix('mid', t));
-  g.addColorStop(1, bgMix('bottom', t));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, world.W, world.H);
-}
-
-function drawRays() {
-  const strength = (1 - world.abyssMix) * 0.85 * (biomeDef.rayBoost || 1);
-  if (strength < 0.02) return;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const r of RAYS) {
-    const x0 = r.fx * world.W;
-    const sway = Math.sin(world.time * 0.12 + r.phase) * 70;
-    const alpha = (0.05 + 0.035 * Math.sin(world.time * 0.3 + r.phase * 2)) * strength;
-    const g = ctx.createLinearGradient(0, 0, 0, world.H * 0.8);
-    g.addColorStop(0, `rgba(150, 225, 255, ${alpha})`);
-    g.addColorStop(1, 'rgba(150, 225, 255, 0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(x0 - r.w * 0.45, 0);
-    ctx.lineTo(x0 + r.w * 0.45, 0);
-    ctx.lineTo(x0 + sway + r.w * 1.3, world.H * 0.8);
-    ctx.lineTo(x0 + sway - r.w * 1.3, world.H * 0.8);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-}
-
 function drawSnow(farLayer) {
-  ctx.save();
+  const c = biomeDef.clima.mota, t = world.time;
+  ctx.fillStyle = luz.css(c, farLayer ? 0.2 : 0.4);
+  ctx.beginPath();
   for (const s of snow) {
     if (s.far !== farLayer) continue;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, TAU);
-    ctx.fillStyle = s.far ? 'rgba(180, 215, 235, 0.16)' : 'rgba(200, 230, 250, 0.3)';
-    ctx.fill();
+    // lo lejano se mueve menos al acompañar a una criatura
+    const x = farLayer ? s.x + (view.x - world.W / 2) * 0.3 : s.x;
+    const r = s.r * (farLayer ? 0.7 : 1);
+    ctx.moveTo(x + r, s.y);
+    ctx.arc(x, s.y, r, 0, TAU);
   }
-  ctx.restore();
-}
-
-function drawLeviatan() {
-  const L = state.leviatan;
-  if (!L.active) return;
-  ctx.save();
-  ctx.translate(L.x, L.y + Math.sin(world.time * 0.4) * 10);
-  ctx.scale(L.dir, 1);
-  ctx.fillStyle = `rgba(2, 8, 16, ${0.32 + world.abyssMix * 0.1})`;
-  const s = 2.6;
-  const sway = Math.sin(world.time * 1.4) * 12;
-  ctx.beginPath();
-  ctx.moveTo(120 * s, 0);
-  ctx.quadraticCurveTo(50 * s, -26 * s, -40 * s, -12 * s);   // lomo
-  ctx.quadraticCurveTo(-90 * s, -6 * s, -118 * s, sway - 30 * s); // lóbulo superior
-  ctx.quadraticCurveTo(-100 * s, sway * 0.4, -118 * s, sway + 22 * s); // lóbulo inferior
-  ctx.quadraticCurveTo(-80 * s, 8 * s, -30 * s, 12 * s);
-  ctx.quadraticCurveTo(50 * s, 24 * s, 120 * s, 0);          // vientre
-  ctx.closePath();
   ctx.fill();
-  // aleta dorsal
-  ctx.beginPath();
-  ctx.moveTo(10 * s, -18 * s);
-  ctx.quadraticCurveTo(-8 * s, -46 * s, -26 * s, -16 * s);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawRock(cx, baseY, parts, t) {
-  for (const [ox, oy, rw, rh] of parts) {
-    ctx.beginPath();
-    ctx.ellipse(cx + ox, baseY + oy - rh * 0.5, rw, rh, 0, 0, TAU);
-    ctx.fillStyle = mixCol([[30, 48, 66], [12, 20, 30]], t);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(cx + ox, baseY + oy - rh * 0.5, rw, rh, 0, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.strokeStyle = `rgba(140, 190, 220, ${0.25 * (1 - t * 0.5)})`;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-}
-
-function drawKelpStrand(k, front) {
-  const x0 = k.fx * world.W;
-  const baseY = world.floorY(x0) + 4;
-  const segs = 7;
-  ctx.save();
-  ctx.lineCap = 'round';
-  for (let strand = 0; strand < 2; strand++) {
-    ctx.beginPath();
-    let px = x0 + strand * 6 - 3, py = baseY;
-    ctx.moveTo(px, py);
-    for (let i = 1; i <= segs; i++) {
-      const tt = i / segs;
-      const sway = Math.sin(world.time * 0.7 + k.phase + strand + i * 0.55) * 15 * tt
-        + Math.sin(world.time * 5.2 + i * 0.9 + strand) * 24 * (k.energy || 0) * tt;
-      const nx = x0 + strand * 6 - 3 + sway;
-      const ny = baseY - k.h * tt;
-      const mx = (px + nx) / 2, my = (py + ny) / 2;
-      ctx.quadraticCurveTo(px, py, mx, my);
-      px = nx; py = ny;
-    }
-    ctx.lineWidth = front ? 5 : 6 - strand * 2;
-    ctx.strokeStyle = front
-      ? `rgba(6, 34, 26, ${0.85 - world.abyssMix * 0.2})`
-      : `rgba(14, 77, 58, ${0.75 - world.abyssMix * 0.25})`;
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawSand() {
-  const t = world.abyssMix;
-  ctx.beginPath();
-  ctx.moveTo(0, world.floorY(0));
-  for (let x = 20; x <= world.W; x += 20) ctx.lineTo(x, world.floorY(x));
-  ctx.lineTo(world.W, world.H);
-  ctx.lineTo(0, world.H);
-  ctx.closePath();
-  const g = ctx.createLinearGradient(0, world.H - 90, 0, world.H);
-  g.addColorStop(0, bgMix('sand', t));
-  g.addColorStop(1, bgMix('sandLo', t));
-  ctx.fillStyle = g;
-  ctx.fill();
-  // guijarros
-  ctx.fillStyle = `rgba(150, 190, 215, ${0.18 * (1 - t * 0.5)})`;
-  for (let i = 0; i < 24; i++) {
-    const x = ((i * 137.5) % world.W);
-    const y = world.floorY(x) + 8 + ((i * 53) % 30);
-    ctx.beginPath();
-    ctx.ellipse(x, y, 3 + (i % 3), 1.6 + (i % 2), 0, 0, TAU);
-    ctx.fill();
-  }
-  for (const r of ROCKS) drawRock(r.fx * world.W, world.floorY(r.fx * world.W) + 4, r.parts, t);
-  if (biomeDef.kelp) for (const k of KELP) drawKelpStrand(k, false);
-  if (biomeDef.spires) drawSpires();
-  if (biomeDef.wreck) drawWreck();
-  if (biomeDef.garden) drawGarden();
-  drawAnemone();
-}
-
-/* el barco hundido en 1912 */
-function drawWreck() {
-  const w = world.wreck;
-  const t = world.time;
-  const x1 = 0.31 * world.W, x2 = 0.74 * world.W;
-  const fl = world.floorY(w.cx);
-  ctx.save();
-  // casco escorado
-  ctx.beginPath();
-  ctx.moveTo(x1, fl + 8);
-  ctx.quadraticCurveTo(x1 + 20, w.deckY + 26, x1 + 90, w.deckY + 14);   // proa
-  ctx.lineTo(x2 - 60, w.deckY - 6);                                     // cubierta inclinada
-  ctx.quadraticCurveTo(x2 + 26, w.deckY + 30, x2, fl + 8);              // popa
-  ctx.closePath();
-  ctx.fillStyle = 'rgb(15, 21, 19)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(110, 150, 125, 0.22)'; // verdín en los bordes
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
-  // brecha del casco (la casa del congrio)
-  ctx.fillStyle = 'rgb(4, 8, 8)';
-  ctx.beginPath();
-  ctx.ellipse(w.hole.x, w.hole.y + 6, 26, 17, -0.15, 0, TAU);
-  ctx.fill();
-  // ojos de buey con luz que aún resiste
-  for (let i = 0; i < 4; i++) {
-    const px = lerp(x1 + 110, x2 - 90, i / 3);
-    const py = lerp(w.deckY + 44, w.deckY + 30, i / 3);
-    const flick = 0.6 + 0.4 * Math.sin(t * 1.3 + i * 2.2);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const gl = ctx.createRadialGradient(px, py, 0, px, py, 9);
-    gl.addColorStop(0, `rgba(255, 196, 120, ${0.16 + 0.1 * flick})`);
-    gl.addColorStop(1, 'rgba(255, 196, 120, 0)');
-    ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(px, py, 9, 0, TAU); ctx.fill();
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(120, 150, 130, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, TAU); ctx.stroke();
-  }
-  // barandilla rota
-  ctx.strokeStyle = 'rgba(70, 95, 80, 0.5)';
-  ctx.lineWidth = 1.4;
-  for (let i = 0; i < 6; i++) {
-    const px = lerp(x1 + 100, x2 - 80, i / 5);
-    const py = lerp(w.deckY + 16, w.deckY - 4, i / 5);
-    if (i === 3) continue; // hueco: por aquí se fue algo
-    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 9); ctx.stroke();
-  }
-  // mástil caído en diagonal, con su cofa
-  const mb = { x: 0.47 * world.W, y: w.deckY + 4 };
-  ctx.strokeStyle = 'rgb(18, 25, 22)';
-  ctx.lineWidth = 7;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(mb.x, mb.y);
-  ctx.lineTo(w.mast.x, w.mast.y + 14);
-  ctx.stroke();
-  // la cofa (el puesto del Vigía)
-  ctx.fillStyle = 'rgb(20, 28, 24)';
-  ctx.beginPath();
-  ctx.moveTo(w.mast.x - 16, w.mast.y + 12);
-  ctx.quadraticCurveTo(w.mast.x, w.mast.y + 22, w.mast.x + 16, w.mast.y + 12);
-  ctx.lineTo(w.mast.x + 12, w.mast.y - 2);
-  ctx.lineTo(w.mast.x - 12, w.mast.y - 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(110, 150, 125, 0.25)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  // el cofre del tesoro, entreabierto y con brillo
-  const ch = w.chest;
-  ctx.fillStyle = 'rgb(26, 20, 12)';
-  ctx.beginPath();
-  ctx.roundRect(ch.x - 15, ch.y - 10, 30, 14, 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.roundRect(ch.x - 16, ch.y - 16, 32, 8, 3);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(150, 120, 60, 0.5)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(ch.x - 15, ch.y - 10, 30, 14);
-  const glint = 0.4 + 0.6 * Math.max(0, Math.sin(t * 0.9));
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const gg = ctx.createRadialGradient(ch.x, ch.y - 9, 0, ch.x, ch.y - 9, 13);
-  gg.addColorStop(0, `rgba(255, 214, 110, ${0.28 * glint})`);
-  gg.addColorStop(1, 'rgba(255, 214, 110, 0)');
-  ctx.fillStyle = gg;
-  ctx.beginPath(); ctx.arc(ch.x, ch.y - 9, 13, 0, TAU); ctx.fill();
-  ctx.restore();
-  ctx.restore();
-}
-
-/* chimeneas hidrotermales del abismo, con su brasa en la cima */
-const SPIRES = [
-  { fx: 0.2, h: 150, w: 24, phase: 0 },
-  { fx: 0.54, h: 215, w: 30, phase: 2.1 },
-  { fx: 0.83, h: 120, w: 19, phase: 4.4 },
-];
-function drawSpires() {
-  for (const s of SPIRES) {
-    const x = s.fx * world.W;
-    const base = world.floorY(x) + 6;
-    const top = base - s.h;
-    ctx.beginPath();
-    ctx.moveTo(x - s.w, base);
-    ctx.quadraticCurveTo(x - s.w * 0.55, top + s.h * 0.4, x - s.w * 0.28, top);
-    ctx.lineTo(x + s.w * 0.3, top);
-    ctx.quadraticCurveTo(x + s.w * 0.6, top + s.h * 0.5, x + s.w, base);
-    ctx.closePath();
-    ctx.fillStyle = 'rgb(9, 12, 17)';
-    ctx.fill();
-    // la brasa de la cima
-    const ember = 0.5 + 0.5 * Math.sin(world.time * 0.9 + s.phase);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const gl = ctx.createRadialGradient(x, top, 0, x, top, 22);
-    gl.addColorStop(0, `rgba(255, 110, 60, ${0.22 * ember + 0.08})`);
-    gl.addColorStop(1, 'rgba(255, 110, 60, 0)');
-    ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(x, top, 22, 0, TAU); ctx.fill();
-    ctx.restore();
-    // humo mineral: burbujas oscuras muy de vez en cuando
-    if (Math.random() < 0.02) {
-      world.bubbles.push(makeBubble(x + rand(-5, 5), top - 4, rand(1, 2.4)));
-    }
+  if (farLayer || luz.reducido) return;
+  for (const m of motas) {
+    const x = ((m.fx * world.W + t * m.r * 0.5) % (world.W + 80)) - 40;
+    const y = ((m.fy * world.H + t * m.r * 0.25) % (world.H + 80)) - 40;
+    luz.halo(ctx, x, y, m.r, c, 0.12);
   }
 }
 
@@ -424,76 +169,6 @@ function updateGarden(dt) {
   }
 }
 
-function drawGarden() {
-  const t = world.time;
-  for (const fl of world.garden) {
-    const x = fl.fx * world.W;
-    const base = world.floorY(x) + 4;
-    const b = fl.bloom;
-    const h = fl.h * (0.2 + 0.8 * b);
-    const sway = Math.sin(t * 0.7 + fl.phase) * 6 * b;
-    const top = { x: x + sway, y: base - h };
-    // tallo
-    ctx.strokeStyle = 'rgba(122, 96, 118, 0.9)';
-    ctx.lineWidth = 2.4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x, base);
-    ctx.quadraticCurveTo(x + sway * 0.4, base - h * 0.6, top.x, top.y);
-    ctx.stroke();
-    // hojas del tallo
-    ctx.fillStyle = 'rgba(130, 176, 150, 0.7)';
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(x + sway * 0.25 + s * 4, base - h * 0.45, 2.4, 6.5 * b, s * 0.7, 0, TAU);
-      ctx.fill();
-    }
-    // corola: pétalos que respiran
-    const r = (7 + 9 * b) * (1 + 0.04 * Math.sin(t * 1.3 + fl.phase));
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * TAU + t * 0.05 + fl.phase;
-      ctx.fillStyle = `hsla(${fl.hue + k * 4}, 65%, ${72 - k * 2}%, ${0.75 * b})`;
-      ctx.beginPath();
-      ctx.ellipse(top.x + Math.cos(a) * r * 0.7, top.y + Math.sin(a) * r * 0.7,
-                  r * 0.62, r * 0.3, a, 0, TAU);
-      ctx.fill();
-    }
-    // el corazón, que alumbra un poco
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const gl = ctx.createRadialGradient(top.x, top.y, 0, top.x, top.y, r * 1.6);
-    gl.addColorStop(0, `rgba(255, 226, 170, ${0.3 * b})`);
-    gl.addColorStop(1, 'rgba(255, 226, 170, 0)');
-    ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(top.x, top.y, r * 1.6, 0, TAU); ctx.fill();
-    ctx.restore();
-    ctx.fillStyle = `rgba(255, 232, 160, ${0.9 * b})`;
-    ctx.beginPath(); ctx.arc(top.x, top.y, r * 0.28, 0, TAU); ctx.fill();
-  }
-}
-
-/* anémona del pez payaso, junto a la primera roca */
-function drawAnemone() {
-  if (!world.creatures.some(c => c.key === 'payaso')) return;
-  const a = world.anemone;
-  ctx.save();
-  ctx.translate(a.x, a.y + 12);
-  ctx.fillStyle = 'rgba(150, 84, 128, 0.85)';
-  ctx.beginPath(); ctx.ellipse(0, 5, 17, 7, 0, 0, TAU); ctx.fill();
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 12; i++) {
-    const bx = (i - 5.5) * 2.7;
-    const sway = Math.sin(world.time * 1.6 + i * 1.1) * 4.5;
-    ctx.strokeStyle = `hsla(${300 + i * 5}, 55%, ${60 + (i % 3) * 7}%, 0.75)`;
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(bx, 3);
-    ctx.quadraticCurveTo(bx + sway * 0.5, -9, bx + sway, -17 - (i % 3) * 3);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 /* ============================================================
    PARTÍCULAS
    ============================================================ */
@@ -504,12 +179,22 @@ function updateParticles(dt) {
     s.x += Math.sin(world.time * 0.5 + s.drift) * 4 * dt;
     if (s.y > world.H + 4) { s.y = -4; s.x = rand(world.W); }
   }
-  // burbujas
+  // humo mineral de las chimeneas: burbujas muy de vez en cuando
+  if (biomeDef.spires) {
+    for (const s of entorno.SPIRES) {
+      if (Math.random() < dt * 1.2) {
+        const x = s.fx * world.W;
+        world.bubbles.push(makeBubble(x + rand(-5, 5), world.floorY(x) - s.h, rand(1, 2.4)));
+      }
+    }
+  }
+  // burbujas: suben hasta salir, deshaciéndose por el camino
   for (let i = world.bubbles.length - 1; i >= 0; i--) {
     const b = world.bubbles[i];
+    b.age = (b.age || 0) + dt;
     b.y -= b.vy * dt;
-    b.x += Math.sin(world.time * 3 + b.phase) * 12 * dt;
-    if (b.y < 46) world.bubbles.splice(i, 1);
+    b.x += Math.sin(world.time * 1.8 + b.phase) * 9 * dt;
+    if (b.y < -8) world.bubbles.splice(i, 1);
   }
   // respiradero (solo en el arrecife)
   if (biomeDef.vent && world.time > VENT.next) {
@@ -533,7 +218,7 @@ function updateParticles(dt) {
     });
   }
   // efervescencia: el mar con gas burbujea entero
-  if (biomeDef.fizz && world.bubbles.length < 150) {
+  if (biomeDef.fizz && world.bubbles.length < 220) {
     if (Math.random() < dt * 26) {
       const fx = rand(world.W);
       world.bubbles.push(makeBubble(fx, world.floorY(fx) - rand(0, world.H * 0.45), rand(0.7, 2)));
@@ -591,83 +276,88 @@ function updateParticles(dt) {
 }
 
 function drawParticles() {
+  const { halo, css } = luz;
   // comida
-  ctx.save();
   for (const p of world.food) {
     const life = p.life || 14;
-    const a = p.age > life - 2 ? Math.max(0, (life - p.age) / 2) : 1;
+    const a = clamp(p.age * 3, 0, 1) * (p.age > life - 2 ? Math.max(0, (life - p.age) / 2) : 1);
     switch (p.type) {
       case 'plancton':
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 1.3, 0, TAU);
-        ctx.fillStyle = `rgba(150, 255, 190, ${0.6 * a})`;
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
+        halo(ctx, p.x, p.y, 8, [150, 255, 190], 0.5 * a);
+        ctx.fillStyle = css([205, 255, 215], 0.75 * a);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.2, 0, TAU); ctx.fill();
         break;
       case 'carnada':
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4.6, 0, TAU);
-        ctx.fillStyle = `rgba(126, 36, 48, ${0.95 * a})`;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(p.x - 1.2, p.y - 1.2, 1.8, 0, TAU);
-        ctx.fillStyle = `rgba(184, 64, 76, ${0.95 * a})`;
-        ctx.fill();
+        luz.nube(ctx, p.x, p.y, 14, 12, [140, 50, 70], 0.5 * a);
+        ctx.fillStyle = css([150, 60, 74], 0.95 * a);
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, 5, 3.8, p.phase, 0, TAU); ctx.fill();
+        ctx.fillStyle = css([205, 110, 112], 0.8 * a);
+        ctx.beginPath(); ctx.ellipse(p.x - 1, p.y - 1.4, 2.4, 1.3, p.phase, 0, TAU); ctx.fill();
         break;
       case 'luz': {
-        const flick = 0.75 + 0.25 * Math.sin(world.time * 9 + p.phase);
-        ctx.globalCompositeOperation = 'lighter';
-        const gl = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16 * flick);
-        gl.addColorStop(0, `rgba(255, 240, 190, ${0.85 * a * flick})`);
-        gl.addColorStop(0.5, `rgba(255, 200, 110, ${0.3 * a})`);
-        gl.addColorStop(1, 'rgba(255, 180, 84, 0)');
-        ctx.fillStyle = gl;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 16 * flick, 0, TAU);
-        ctx.fill();
-        ctx.fillStyle = `rgba(255, 252, 240, ${0.95 * a})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2.6, 0, TAU);
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
+        const k = 0.85 + 0.15 * Math.sin(world.time * 1.2 + p.phase);
+        halo(ctx, p.x, p.y, 70 * k, [255, 200, 120], 0.5 * a);
+        halo(ctx, p.x, p.y, 20, [255, 240, 200], 0.9 * a);
+        ctx.fillStyle = css([255, 250, 236], 0.95 * a);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, TAU); ctx.fill();
         break;
       }
       default: // pellet
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2.6, 0, TAU);
-        ctx.fillStyle = `rgba(255, 180, 84, ${0.9 * a})`;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(p.x - 0.8, p.y - 0.8, 0.9, 0, TAU);
-        ctx.fillStyle = `rgba(255, 235, 190, ${0.9 * a})`;
-        ctx.fill();
+        halo(ctx, p.x, p.y, 7, [255, 196, 120], 0.35 * a);
+        ctx.fillStyle = css([238, 190, 128], 0.95 * a);
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, 2.5, 1.9, p.phase, 0, TAU); ctx.fill();
     }
   }
-  // chispas
-  ctx.globalCompositeOperation = 'lighter';
+  // chispas: nacen y se van con fundido
   for (const s of world.sparks) {
-    const a = 1 - s.age / s.life;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 1.6 * a + 0.4, 0, TAU);
-    ctx.fillStyle = `hsla(${s.hue}, 95%, 70%, ${0.8 * a})`;
-    ctx.fill();
+    const k = s.age / s.life;
+    const a = Math.min(1, k * 5) * (1 - k);
+    if (a <= 0.01) continue;
+    halo(ctx, s.x, s.y, 3 + 5 * a, colorDeTono(s.hue), a);
   }
-  ctx.globalCompositeOperation = 'source-over';
   // burbujas
   for (const b of world.bubbles) {
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, TAU);
-    ctx.strokeStyle = 'rgba(210, 240, 255, 0.4)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.28, 0, TAU);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.fill();
+    const a = Math.min(1, (b.age || 0) * 2.5) * clamp((b.y + 4) / 150, 0, 1);
+    if (a < 0.02) continue;
+    const r = b.r * (1 + Math.max(0, 1 - b.y / world.H) * 0.25); // crecen al subir
+    const d = r * 2.5;
+    ctx.globalAlpha = a;
+    ctx.drawImage(spriteBurbuja(), b.x - d / 2, b.y - d / 2, d, d);
   }
-  ctx.restore();
+  ctx.globalAlpha = 1;
   for (const e of world.effects) e.draw(ctx);
+}
+
+/* tono de una chispa → color, en escalones para reutilizar halos */
+const _tonos = [];
+function colorDeTono(hue) {
+  const i = ((Math.round((hue || 0) / 12) % 30) + 30) % 30;
+  if (!_tonos[i]) {
+    const f = n => {
+      const k = (n + i * 12 / 30) % 12;
+      return 255 * (0.78 - 0.2 * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+    };
+    _tonos[i] = [f(0), f(8), f(4)];
+  }
+  return _tonos[i];
+}
+
+let _burbuja = null;
+function spriteBurbuja() {
+  if (_burbuja) return _burbuja;
+  _burbuja = document.createElement('canvas');
+  _burbuja.width = _burbuja.height = 40;
+  const x = _burbuja.getContext('2d');
+  const g = x.createRadialGradient(20, 20, 4, 20, 20, 18);
+  g.addColorStop(0, 'rgba(220,250,255,0.02)');
+  g.addColorStop(0.75, 'rgba(220,250,255,0.14)');
+  g.addColorStop(0.92, 'rgba(230,252,255,0.75)');
+  g.addColorStop(1, 'rgba(230,252,255,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, 40, 40);
+  x.fillStyle = 'rgba(255,255,255,0.9)';
+  x.beginPath(); x.ellipse(13.5, 13, 4, 2.6, -0.7, 0, TAU); x.fill();
+  return _burbuja;
 }
 
 /* ============================================================
@@ -701,14 +391,14 @@ const GROUP_LABELS = {
   reales: 'ESPECIES REALES',
   ficticios: 'ESPECIES FICTICIAS',
   expedicion: 'EXPEDICIÓN',
-};
+}; // se traducen al pintarlas
 
 function buildPanel() {
   panelBody.innerHTML = `
     <div id="speciesList"></div>
-    <div class="group-title ambiente">AMBIENTE</div>
+    <div class="group-title ambiente">${tr('AMBIENTE')}</div>
     <div class="switch-row">
-      <span class="name">Modo abisal</span>
+      <span class="name">${tr('Modo abisal')}</span>
       <span class="switch">
         <input type="checkbox" id="abyssToggle">
         <span class="track"></span>
@@ -739,7 +429,7 @@ function rebuildSpeciesList() {
       if (sp.grupo === grupo && sp.bioma === save.biome) { any = true; break; }
     }
     if (!any) continue;
-    html += `<div class="group-title ${grupo}">${GROUP_LABELS[grupo]}</div>`;
+    html += `<div class="group-title ${grupo}">${tr(GROUP_LABELS[grupo])}</div>`;
     for (const [key, sp] of Object.entries(SPECIES)) {
       if (sp.grupo !== grupo || sp.bioma !== save.biome) continue;
       if (!isSeen(key)) {
@@ -755,9 +445,9 @@ function rebuildSpeciesList() {
           <span class="dot" style="--c:${sp.color}"></span>
           <span class="name">${sp.nombre}</span>
           <span class="ctr">
-            <button data-key="${key}" data-d="-1" aria-label="Quitar ${sp.nombre}">−</button>
+            <button data-key="${key}" data-d="-1" aria-label="${tr('Quitar {nombre}', sp)}">−</button>
             <span class="cnt" id="cnt-${key}">0</span>
-            <button data-key="${key}" data-d="1" aria-label="Añadir ${sp.nombre}">+</button>
+            <button data-key="${key}" data-d="1" aria-label="${tr('Añadir {nombre}', sp)}">+</button>
           </span>
         </div>`;
     }
@@ -769,6 +459,13 @@ function rebuildSpeciesList() {
 function countOf(key) {
   let n = 0;
   for (const c of world.creatures) if (c.key === key && !c.leaving) n++;
+  return n;
+}
+
+/* lo que es tuyo: los invitados de un momento no se guardan */
+function poblacion(key) {
+  let n = 0;
+  for (const c of world.creatures) if (c.key === key && !c.leaving && !c.invitado) n++;
   return n;
 }
 
@@ -880,17 +577,17 @@ function adjustSpecies(key, dir) {
     const n = Math.min(paso, room);
     if (n > 0) spawnArrival(key, n);
   } else {
-    let toRemove = Math.min(paso, countOf(key));
+    let toRemove = Math.min(paso, poblacion(key));
     for (let i = world.creatures.length - 1; i >= 0 && toRemove > 0; i--) {
       const c = world.creatures[i];
-      if (c.key === key && !c.leaving) {
+      if (c.key === key && !c.leaving && !c.invitado) {
         if (state.selected === c) deselect();
         dismiss(c);
         toRemove--;
       }
     }
   }
-  save.counts[key] = countOf(key);
+  save.counts[key] = poblacion(key);
   persistSave();
   updateCounts();
 }
@@ -904,30 +601,33 @@ function toast(txt, cls = '') {
   el.className = 'toast ' + cls;
   el.textContent = txt;
   toastsEl.appendChild(el);
-  setTimeout(() => el.remove(), 3800);
+  setTimeout(() => el.remove(), 5400);
   while (toastsEl.children.length > 4) toastsEl.firstChild.remove();
 }
 
 function registerSpecies(key) {
   if (isSeen(key)) return;
   save.seen[key] = Date.now();
-  save.counts[key] = countOf(key) || SPECIES[key].inicial || 1;
+  save.counts[key] = poblacion(key) || SPECIES[key].inicial || 1;
   persistSave();
-  toast(`✦ Especie registrada — ${SPECIES[key].nombre}`);
+  toast(tr('✦ Especie registrada — {nombre}', SPECIES[key]));
   audio.event('descubrimiento');
   rebuildSpeciesList();
   refreshAlbumUI();
   const t = albumTotals();
-  if (t.seen === t.total) toast('✧ Bitácora completa. La expedición Nº7 hace historia.', 'hito');
-  // ¿se abre el siguiente ecosistema?
-  const ni = BIOME_ORDER.indexOf(save.biome) + 1;
-  const nk = BIOME_ORDER[ni];
+  if (t.seen === t.total) toast(tr('✧ Bitácora completa. La expedición Nº7 hace historia.'), 'hito');
+  comprobarDesbloqueo();
+}
+
+/* Toda vía de registro (observar, clic, foto) pasa por aquí */
+function comprobarDesbloqueo() {
+  const nk = BIOME_ORDER[BIOME_ORDER.indexOf(save.biome) + 1];
   if (nk && biomeUnlocked(nk) && !state.unlockToasted[nk]) {
     state.unlockToasted[nk] = true;
-    toast(`✧ Nuevo ecosistema al alcance: ${BIOMES[nk].nombre} — flechas junto al profundímetro`, 'hito');
+    toast(tr('✧ Nuevo ecosistema al alcance: {bioma}. Usa la flecha ▸ de arriba.', { bioma: BIOMES[nk].nombre }), 'hito');
     audio.event('descubrimiento');
-    refreshBiomeUI();
   }
+  refreshBiomeUI();
 }
 
 function photographSpecies(key, url) {
@@ -936,15 +636,16 @@ function photographSpecies(key, url) {
   save.photos[key] = url;
   if (!wasSeen) {
     save.seen[key] = Date.now();
-    save.counts[key] = countOf(key) || SPECIES[key].inicial || 1;
+    save.counts[key] = poblacion(key) || SPECIES[key].inicial || 1;
     rebuildSpeciesList();
   }
   persistSave();
-  toast(first ? `◉ Entrada completa en el álbum — ${SPECIES[key].nombre}` : `◉ Foto actualizada — ${SPECIES[key].nombre}`, 'foto');
+  toast(tr(first ? '◉ Entrada completa en el álbum — {nombre}' : '◉ Foto actualizada — {nombre}', SPECIES[key]), 'foto');
   refreshAlbumUI();
+  if (!wasSeen) comprobarDesbloqueo();
   if (first) {
     const t = albumTotals();
-    if (t.shot === t.total) toast('✧ Álbum fotográfico completo. Nadie te lo pidió y aun así lo hiciste.', 'hito');
+    if (t.shot === t.total) toast(tr('✧ Álbum fotográfico completo. Nadie te lo pidió y aun así lo hiciste.'), 'hito');
   }
 }
 
@@ -992,12 +693,12 @@ function updateDirector() {
 function updateCounts() {
   let total = 0;
   for (const key of Object.keys(SPECIES)) {
-    const n = countOf(key);
+    const n = poblacion(key);
     total += n;
     const el = document.getElementById('cnt-' + key);
     if (el) el.textContent = n;
   }
-  document.getElementById('pop').textContent = `POBLACIÓN: ${total}`;
+  document.getElementById('pop').textContent = tr('POBLACIÓN: {n}', { n: total });
 }
 
 document.getElementById('menuBtn').addEventListener('click', () => {
@@ -1030,13 +731,13 @@ function select(creature) {
   const sp = creature.sp;
   if (state.mode === 'descubrimiento') registerSpecies(creature.key); // mirarla de cerca cuenta
   const shot = hasPhoto(creature.key);
-  cardEls.badge.textContent = BADGE_TEXT[sp.tipo];
+  cardEls.badge.textContent = tr(BADGE_TEXT[sp.tipo]);
   cardEls.badge.className = 'badge ' + sp.tipo;
   cardEls.name.textContent = sp.nombre;
   cardEls.sci.textContent = sp.sci;
   cardEls.fact.textContent = shot
     ? sp.fact
-    : 'Entrada sin fotografiar. Pulsa C, enfócala y dispara: la expedición completará su informe en el álbum.';
+    : tr('Entrada sin fotografiar. Pulsa C, enfócala y dispara: la expedición completará su informe en el álbum.');
   cardEls.fact.classList.toggle('locked', !shot);
   cardEls.tam.textContent = sp.tam;
   cardEls.prof.textContent = sp.prof;
@@ -1138,6 +839,7 @@ function feed(x, y) {
   }
   for (let i = 0; i < 3; i++) world.bubbles.push(makeBubble(x + rand(-8, 8), y + rand(-6, 6), rand(1.5, 3.5)));
   audio.event('burbuja');
+  momentos.alAlimentar(bait, x, y);
 }
 
 canvas.addEventListener('pointerdown', e => {
@@ -1151,6 +853,7 @@ canvas.addEventListener('pointerdown', e => {
     if (c.key === 'electrica') dischargeEel(c);
     if (c.key === 'campana') { c.ring = 1; audio.event('campana'); }
     if (c.key === 'diente') { c.puff(); audio.event('vilano'); }
+    if (momentos.alTocar(c)) deselect(); // la ficha no debe tapar lo que acaba de empezar
   } else {
     deselect();
     if (!touchEnvironment(x, y)) feed(x, y);
@@ -1230,7 +933,7 @@ setBait(save.bait || 'pellet');
 const soundBtn = document.getElementById('soundBtn');
 function refreshSoundBtn() {
   soundBtn.classList.toggle('off', audio.muted);
-  soundBtn.innerHTML = audio.muted ? '♪&nbsp;MUDO' : '♪&nbsp;SONIDO';
+  soundBtn.innerHTML = `<i>♪</i><span>${tr(audio.muted ? 'MUDO' : 'SONIDO')}</span>`;
 }
 soundBtn.addEventListener('click', () => {
   audio.init();
@@ -1462,8 +1165,11 @@ function setCamera(on) {
     deselect();
     closePanel();
     closeAlbum();
-    positionViewfinder(world.mouse.active ? world.mouse.x : world.W / 2,
-                       world.mouse.active ? world.mouse.y : world.H / 2);
+    // el ratón vive en el mundo y el visor en la pantalla
+    const p = world.mouse.active
+      ? toScreen(world.mouse.x, world.mouse.y)
+      : { x: world.W / 2, y: world.H / 2 };
+    positionViewfinder(p.x, p.y);
   }
 }
 
@@ -1475,7 +1181,7 @@ function shoot(mx, my) {
   flashEl.style.animation = 'none';
   void flashEl.offsetWidth;
   flashEl.style.animation = '';
-  setTimeout(() => { flashEl.hidden = true; }, 480);
+  setTimeout(() => { flashEl.hidden = true; }, 760);
   audio.event('foto');
   // el flash delata a los peces moneda: el oro no sabe ser discreto
   for (const c of world.creatures) {
@@ -1487,6 +1193,16 @@ function shoot(mx, my) {
   tmp.width = outW; tmp.height = outH;
   tmp.getContext('2d').drawImage(canvas, rx * DPR, ry * DPR, VF_W * DPR, VF_H * DPR, 0, 0, outW, outH);
   const url = tmp.toDataURL('image/jpeg', 0.72);
+  const momento = momentos.fotografiar({ x: rx, y: ry, w: VF_W, h: VF_H }, url);
+  if (momento) {
+    toast(tr(momento.primera ? '❋ Momento en el álbum — {nombre}' : '❋ Momento actualizado — {nombre}', momento), 'momento');
+    if (momento.primera) {
+      audio.event('descubrimiento');
+      const t = momentos.totales();
+      if (t.hechos === t.total) toast(tr('✧ Los diez momentos. Has mirado de verdad. No se lo digas a nadie.'), 'hito');
+    }
+    refreshAlbumUI();
+  }
   // qué especies salen en el encuadre
   const captured = new Set();
   for (const c of world.creatures) {
@@ -1497,7 +1213,8 @@ function shoot(mx, my) {
     }
   }
   if (!captured.size) {
-    toast('◉ Solo agua. Bonita, eso sí.', 'foto');
+    if (momento) return;
+    toast(tr('◉ Solo agua. Bonita, eso sí.'), 'foto');
     return;
   }
   for (const key of captured) photographSpecies(key, url);
@@ -1522,10 +1239,20 @@ function refreshBiomeUI() {
   const idx = BIOME_ORDER.indexOf(save.biome);
   biomePrevBtn.disabled = idx <= 0;
   const nk = BIOME_ORDER[idx + 1];
-  biomeNextBtn.disabled = !nk || !biomeUnlocked(nk);
-  biomeNextBtn.title = nk && !biomeUnlocked(nk)
-    ? `Registra ${biomeThreshold(save.biome)} especies de este ecosistema para descender`
-    : nk ? `Descender a ${BIOMES[nk].nombre}` : 'No hay nada más abajo. Todavía.';
+  // cerrada sigue admitiendo clic: tiene que poder decir cuánto falta
+  const cerrado = !!nk && !biomeUnlocked(nk);
+  biomeNextBtn.disabled = !nk;
+  biomeNextBtn.classList.toggle('cerrado', cerrado);
+  biomeNextBtn.title = cerrado
+    ? avisoBloqueo()
+    : nk ? tr('Descender a {bioma}', { bioma: BIOMES[nk].nombre }) : tr('No hay nada más abajo. Todavía.');
+  biomeNextBtn.setAttribute('aria-label', biomeNextBtn.title);
+}
+
+function avisoBloqueo() {
+  const van = biomeSeenCount(save.biome), piden = biomeThreshold(save.biome);
+  const base = tr('Para descender: {piden} especies registradas aquí. Llevas {van}.', { piden, van });
+  return state.mode === 'acuario' ? `${base} ${tr('Se registran en modo Descubrimiento.')}` : base;
 }
 
 let traveling = false;
@@ -1533,9 +1260,13 @@ function travel(dir) {
   if (traveling || !state.mode) return;
   const idx = BIOME_ORDER.indexOf(save.biome);
   const nk = BIOME_ORDER[idx + dir];
-  if (!nk || !biomeUnlocked(nk)) return;
+  if (!nk) return;
+  if (!biomeUnlocked(nk)) {
+    if (!toastsEl.querySelector('.bloqueo')) toast(avisoBloqueo(), 'bloqueo');
+    return;
+  }
   traveling = true;
-  document.getElementById('descendDir').textContent = dir > 0 ? 'DESCENDIENDO' : 'ASCENDIENDO';
+  document.getElementById('descendDir').textContent = tr(dir > 0 ? 'DESCENDIENDO' : 'ASCENDIENDO');
   document.getElementById('descendName').textContent = BIOMES[nk].nombre;
   descendEl.classList.add('on');
   setCamera(false);
@@ -1544,6 +1275,7 @@ function travel(dir) {
   closePanel();
   setTimeout(() => {
     // cambio de ecosistema con la pantalla a oscuras
+    momentos.cancelar();
     world.creatures.length = 0;
     world.food.length = 0;
     world.sparks.length = 0;
@@ -1558,6 +1290,7 @@ function travel(dir) {
     rebuildSpeciesList();
     refreshBiomeUI();
     nextVisitor = world.time + 5;
+    momentos.llegar();
     updateCounts();
   }, 950);
   setTimeout(() => {
@@ -1577,6 +1310,7 @@ const startEl = document.getElementById('start');
 const subtitleEl = document.querySelector('.subtitle');
 
 function showStart() {
+  momentos.cancelar();
   state.mode = null;
   setCamera(false);
   stopFollow();
@@ -1585,25 +1319,49 @@ function showStart() {
   closeAlbum();
   document.body.classList.add('start');
   startEl.classList.remove('gone');
+  textosInicio();
+}
+
+function textosInicio() {
   const t = albumTotals();
   document.getElementById('mcDesc').textContent =
-    t.seen ? `ÁLBUM ${t.seen}/${t.total} · CONTINUAR` : 'NUEVA EXPEDICIÓN';
+    t.seen ? tr('ÁLBUM {seen}/{total} · CONTINUAR', t) : tr('NUEVA EXPEDICIÓN');
   document.getElementById('mcAcua').textContent =
-    t.seen ? `${t.seen} ESPECIES DISPONIBLES` : 'AÚN SIN ESPECIES — DESCUBRE PRIMERO';
+    t.seen ? tr('{n} ESPECIES DISPONIBLES', { n: t.seen }) : tr('AÚN SIN ESPECIES — DESCUBRE PRIMERO');
+  for (const b of startEl.querySelectorAll('[data-idioma]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.idioma === idioma.actual));
+  }
+}
+
+/* cambiar de idioma solo desde el inicio: aquí no hay ficha, álbum ni
+   pista abiertos, y lo demás se repinta */
+function cambiarIdioma(nuevo) {
+  if (nuevo === idioma.actual) return;
+  idioma.cambiar(nuevo);
+  resetBtn.textContent = tr('reiniciar expedición');
+  resetBtn.classList.remove('armed');
+  resetArmed = 0;
+  rebuildSpeciesList();
+  refreshBiomeUI();
+  refreshSoundBtn();
+  refreshAlbumHud();
+  updateDepth(1);
+  textosInicio();
 }
 
 function applyMode(mode) {
   state.mode = mode;
+  momentos.llegar();
   save.mode = mode;
   persistSave();
   document.body.classList.remove('start');
   startEl.classList.add('gone');
-  subtitleEl.textContent = mode === 'acuario'
+  subtitleEl.textContent = tr(mode === 'acuario'
     ? 'MODO ACUARIO · PECERA LIBRE'
-    : 'MODO DESCUBRIMIENTO';
-  hint.innerHTML = mode === 'acuario'
+    : 'MODO DESCUBRIMIENTO');
+  hint.innerHTML = tr(mode === 'acuario'
     ? 'Gestiona tus especies en la bitácora&nbsp;·&nbsp;elige cebo abajo&nbsp;·&nbsp;la cámara (<b>C</b>) es para el recuerdo'
-    : 'Observa las criaturas para registrarlas&nbsp;·&nbsp;pulsa <b>C</b> y fotografíalas&nbsp;·&nbsp;toca el agua para dar de comer';
+    : 'Observa para registrar&nbsp;·&nbsp;pulsa <b>C</b> para fotografiar&nbsp;·&nbsp;toca el agua para dar de comer<br>Y quédate un rato: algunas cosas solo pasan si hay alguien mirando.');
   hint.classList.remove('gone', 'show');
   void hint.offsetWidth; // reiniciar la animación de la pista
   hint.classList.add('show');
@@ -1622,6 +1380,8 @@ function applyMode(mode) {
 startEl.addEventListener('click', e => {
   const card = e.target.closest('.mode-card');
   if (card) applyMode(card.dataset.mode);
+  const lengua = e.target.closest('[data-idioma]');
+  if (lengua) cambiarIdioma(lengua.dataset.idioma);
 });
 document.getElementById('homeBtn').addEventListener('click', showStart);
 
@@ -1629,16 +1389,17 @@ document.getElementById('homeBtn').addEventListener('click', showStart);
 const resetBtn = document.getElementById('resetBtn');
 let resetArmed = 0;
 resetBtn.addEventListener('click', () => {
-  if (performance.now() - resetArmed < 4000) {
+  if (resetArmed && performance.now() - resetArmed < 4000) {
     try { localStorage.removeItem(SAVE_KEY); } catch (err) { /* nada */ }
+    momentos.borrar();
     location.reload();
     return;
   }
   resetArmed = performance.now();
-  resetBtn.textContent = '¿seguro? se borrará todo el álbum';
+  resetBtn.textContent = tr('¿seguro? se borrará todo el álbum');
   resetBtn.classList.add('armed');
   setTimeout(() => {
-    resetBtn.textContent = 'reiniciar expedición';
+    resetBtn.textContent = tr('reiniciar expedición');
     resetBtn.classList.remove('armed');
     resetArmed = 0;
   }, 4000);
@@ -1655,12 +1416,12 @@ function updateDepth(dt) {
   depthTimer = 0.4;
   if (biomeDef.profundidad == null) {
     // el profundímetro lo intenta, de verdad que lo intenta
-    depthEl.textContent = Math.random() < 0.06 ? `−${rand(1000, 9999).toFixed(1).replace('.', ',')} m` : '−??? m';
+    depthEl.textContent = Math.random() < 0.06 ? `−${idioma.decimal(rand(1000, 9999))} m` : '−??? m';
     return;
   }
   const base = lerp(biomeDef.profundidad, biomeDef.profundidad + 310, world.abyssMix);
   const d = base + Math.sin(world.time * 0.35) * 1.7;
-  depthEl.textContent = `−${d.toFixed(1).replace('.', ',')} m`;
+  depthEl.textContent = `−${idioma.decimal(d)} m`;
 }
 
 /* ============================================================
@@ -1694,14 +1455,24 @@ function populate() {
 /* ============================================================
    BUCLE PRINCIPAL
    ============================================================ */
+/* con zoom, lo que queda fuera del encuadre no se pinta */
+function fueraDeVista(c) {
+  if (view.scale <= 1.02) return false;
+  const m = (c.len || 110) * 1.4 + 90;
+  return Math.abs(c.x - view.x) > world.W / (2 * view.scale) + m
+    || Math.abs(c.y - view.y) > world.H / (2 * view.scale) + m;
+}
+
 function drawCreatures() {
   for (const key of LAYER_ORDER) {
     for (const c of world.creatures) {
       if (c.key !== key) continue;
       const a = c.alpha ?? 1;
+      if (a <= 0.01 || fueraDeVista(c)) continue;
+      luz.hondura = clamp(c.y / world.H, 0, 1);
       if (a >= 1) {
         c.draw(ctx);
-      } else if (a > 0.01) {
+      } else {
         ctx.save();
         ctx.globalAlpha = a;
         c.draw(ctx);
@@ -1713,6 +1484,8 @@ function drawCreatures() {
 
 let last = performance.now();
 function frame(now) {
+  luz.medir(Math.min(0.2, (now - last) / 1000));
+  if (DPR !== densidad()) ajustarLienzo();
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   world.time += dt;
@@ -1733,6 +1506,7 @@ function frame(now) {
   updateObservation(dt);
   applyCurrent(dt);
   for (const c of world.creatures) c.update(dt);
+  momentos.actualizar(dt);
   // retirar a quienes ya salieron de escena
   for (let i = world.creatures.length - 1; i >= 0; i--) {
     if (world.creatures[i].dead) world.creatures.splice(i, 1);
@@ -1742,17 +1516,22 @@ function frame(now) {
   const vt = viewTransform();
   ctx.setTransform(DPR * vt.s, 0, 0, DPR * vt.s, DPR * vt.tx, DPR * vt.ty);
 
-  drawBackground();
+  // del fondo hacia el ojo
+  const esc = entorno.escena();
+  luz.agua = esc.mid;
+  agua.pintar(ctx, esc, world.W, world.H);
+  entorno.lejos(ctx);
   drawSnow(true);
-  drawLeviatan();
-  drawRays();
-  drawSand();
-  drawSnow(false);
+  entorno.fondo(ctx);
   drawCreatures();
+  momentos.pintar(ctx);
   drawParticles();
-  if (biomeDef.kelp) drawKelpStrand(KELP_FRONT, true);
+  drawSnow(false);
+  entorno.frente(ctx);
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  entorno.vineta(ctx);
+  luz.agua = null; // lo que se pinte fuera del mundo (retratos) va sin tinte
   positionCard();
   updateDepth(dt);
   requestAnimationFrame(frame);

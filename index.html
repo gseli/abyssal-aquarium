@@ -1,74 +1,76 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Acuario Abisal — criaturas reales & ficticias</title>
+<title>Abyssal Aquarium — real & fictional creatures</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦈</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 
 <canvas id="sea"></canvas>
 
-<!-- capas de atmósfera -->
-<div class="vignette" aria-hidden="true"></div>
-<div class="grain" aria-hidden="true"></div>
-
 <!-- pantalla de inicio -->
 <div id="start">
   <div class="start-inner">
-    <p class="start-over">EXPEDICIÓN&nbsp;Nº7</p>
-    <h1 class="start-title">ACUARIO <em>ABISAL</em></h1>
-    <p class="start-sub">CRIATURAS REALES&nbsp;·&nbsp;&amp;&nbsp;·&nbsp;FICTICIAS</p>
+    <p class="start-over">EXPEDITION No.&nbsp;7</p>
+    <h1 class="start-title">ABYSSAL <em>AQUARIUM</em></h1>
+    <p class="start-sub">REAL&nbsp;·&nbsp;&amp;&nbsp;·&nbsp;FICTIONAL CREATURES</p>
     <div class="modes">
       <button class="mode-card" data-mode="descubrimiento">
-        <span class="mc-name">✦&nbsp;DESCUBRIMIENTO</span>
-        <span class="mc-desc">Observa, fotografía y completa el álbum. Las especies llegan solas — y algunas tienen sus condiciones.</span>
+        <span class="mc-name">✦&nbsp;DISCOVERY</span>
+        <span class="mc-desc">Observe, photograph and complete the album. Species arrive on their own — and some of them have conditions.</span>
         <span class="mc-status" id="mcDesc">—</span>
       </button>
       <button class="mode-card" data-mode="acuario">
-        <span class="mc-name">◉&nbsp;ACUARIO</span>
-        <span class="mc-desc">Tu pecera libre: solo las especies ya descubiertas, las que tú elijas. Sin retos; la cámara queda de recuerdo.</span>
+        <span class="mc-name">◉&nbsp;AQUARIUM</span>
+        <span class="mc-desc">Your own free tank: only species you’ve already discovered, whichever you like. No challenges; the camera is just for keepsakes.</span>
         <span class="mc-status" id="mcAcua">—</span>
       </button>
     </div>
-    <button id="resetBtn">reiniciar expedición</button>
+    <div class="start-foot">
+      <div class="idiomas" role="group" aria-label="Language">
+        <button data-idioma="en" lang="en">English</button>
+        <button data-idioma="es" lang="es">Español</button>
+      </div>
+      <button id="resetBtn">restart expedition</button>
+    </div>
   </div>
 </div>
 
 <!-- HUD superior -->
 <header class="hud">
   <div class="hud-left">
-    <button id="homeBtn" aria-label="Volver al inicio">⌂&nbsp;INICIO</button>
-    <button id="menuBtn" aria-label="Abrir bitácora">☰&nbsp;BITÁCORA</button>
-    <button id="albumBtn" aria-label="Abrir álbum">✦&nbsp;ÁLBUM&nbsp;<span id="albumProgress">0/18</span></button>
-    <button id="cameraBtn" aria-label="Modo cámara">◉&nbsp;CÁMARA&nbsp;<kbd>C</kbd></button>
-    <button id="soundBtn" aria-label="Silenciar sonido">♪&nbsp;SONIDO</button>
+    <button id="homeBtn" aria-label="Back to the start screen" title="Home"><i>⌂</i><span>HOME</span></button>
+    <button id="menuBtn" aria-label="Open logbook" title="Logbook"><i>☰</i><span>LOGBOOK</span></button>
+    <button id="albumBtn" aria-label="Open album" title="Album"><i>✦</i><span>ALBUM</span><span id="albumProgress">0/44</span></button>
+    <button id="cameraBtn" aria-label="Camera mode" title="Camera (C)"><i>◉</i><span>CAMERA</span><kbd>C</kbd></button>
+    <button id="soundBtn" aria-label="Mute sound" title="Sound"><i>♪</i><span>SOUND</span></button>
   </div>
   <div class="title-block">
-    <h1>ACUARIO <em>ABISAL</em></h1>
-    <p class="subtitle">CRIATURAS REALES&nbsp;·&nbsp;&amp;&nbsp;·&nbsp;FICTICIAS</p>
+    <h1>ABYSSAL <em>AQUARIUM</em></h1>
+    <p class="subtitle">REAL&nbsp;·&nbsp;&amp;&nbsp;·&nbsp;FICTIONAL CREATURES</p>
   </div>
   <div class="hud-right">
     <div class="depth-block">
-      <span class="depth-label">PROFUNDIDAD</span>
-      <span id="depth">−38,0 m</span>
+      <span class="depth-label">DEPTH</span>
+      <span id="depth">−38.0 m</span>
     </div>
     <div class="biome-block">
-      <button id="biomePrev" aria-label="Ascender de ecosistema">◂</button>
-      <span id="biomeName">EL ARRECIFE</span>
-      <button id="biomeNext" aria-label="Descender de ecosistema">▸</button>
+      <button id="biomePrev" aria-label="Rise to the previous ecosystem">◂</button>
+      <span id="biomeName">THE REEF</span>
+      <button id="biomeNext" aria-label="Descend to the next ecosystem">▸</button>
     </div>
   </div>
 </header>
 
 <!-- transición entre biomas -->
 <div id="descend">
-  <span id="descendDir">DESCENDIENDO</span>
+  <span id="descendDir">DESCENDING</span>
   <b id="descendName">—</b>
 </div>
 
@@ -76,7 +78,7 @@
 <div id="viewfinder" hidden>
   <span class="vf-corner tl"></span><span class="vf-corner tr"></span>
   <span class="vf-corner bl"></span><span class="vf-corner br"></span>
-  <span class="vf-label">REC&nbsp;·&nbsp;EXPEDICIÓN&nbsp;Nº7</span>
+  <span class="vf-label">REC&nbsp;·&nbsp;EXPEDITION No.&nbsp;7</span>
 </div>
 <div id="flash" hidden></div>
 
@@ -86,26 +88,31 @@
 <!-- álbum de expedición -->
 <div id="album" hidden>
   <div class="album-head">
-    <h2>Álbum de la expedición</h2>
-    <span id="albumCount">0 registradas · 0 fotografiadas</span>
-    <button id="albumClose" aria-label="Cerrar álbum">×</button>
+    <h2>Expedition album</h2>
+    <div class="album-tabs" role="tablist">
+      <button class="album-tab" id="tabEspecies" role="tab" aria-selected="true" aria-controls="albumGrid">SPECIES</button>
+      <button class="album-tab" id="tabMomentos" role="tab" aria-selected="false" aria-controls="momentosGrid">MOMENTS <span id="momentosProgress">0/10</span></button>
+    </div>
+    <span id="albumCount"></span>
+    <button id="albumClose" aria-label="Close album">×</button>
   </div>
   <div class="album-body">
     <div id="albumGrid"></div>
-    <div id="albumDetail" class="empty"><p class="album-hint">Elige una entrada del álbum.</p></div>
+    <div id="albumDetail" class="empty"><p class="album-hint">Pick an entry from the album.</p></div>
+    <div id="momentosGrid" role="tabpanel" hidden></div>
   </div>
 </div>
 
 <!-- panel bitácora -->
 <aside id="panel" aria-hidden="true">
   <div class="panel-head">
-    <h2>Bitácora de expedición</h2>
-    <button id="panelClose" aria-label="Cerrar panel">×</button>
+    <h2>Expedition logbook</h2>
+    <button id="panelClose" aria-label="Close panel">×</button>
   </div>
   <div id="panelBody"><!-- generado por JS --></div>
   <div class="panel-foot">
     <span id="pop">—</span>
-    <span class="ver">EXPEDICIÓN Nº7 · v0.9</span>
+    <span class="ver">EXPEDITION No.&nbsp;7 · v0.9</span>
   </div>
 </aside>
 
@@ -114,42 +121,50 @@
   <div class="card-head">
     <span id="cardBadge" class="badge">REAL</span>
     <span class="card-actions">
-      <button id="cardFollow" aria-label="Seguir a la criatura">◉&nbsp;SEGUIR</button>
-      <button id="cardClose" aria-label="Cerrar ficha">×</button>
+      <button id="cardFollow" aria-label="Follow the creature">◉&nbsp;FOLLOW</button>
+      <button id="cardClose" aria-label="Close card">×</button>
     </span>
   </div>
   <h2 id="cardName">—</h2>
   <p id="cardSci" class="sci">—</p>
   <p id="cardFact" class="fact">—</p>
   <div class="stats">
-    <div><label>TAMAÑO</label><span id="statTam">—</span></div>
-    <div><label>PROFUNDIDAD</label><span id="statProf">—</span></div>
-    <div><label>DIETA</label><span id="statDieta">—</span></div>
+    <div><label>SIZE</label><span id="statTam">—</span></div>
+    <div><label>DEPTH</label><span id="statProf">—</span></div>
+    <div><label>DIET</label><span id="statDieta">—</span></div>
   </div>
 </div>
 
 <!-- selector de cebo -->
 <div id="baitDock">
-  <span class="bait-title">CEBO</span>
-  <button class="bait" data-bait="plancton"><i>✺</i>PLANCTON<kbd>1</kbd></button>
+  <span class="bait-title">BAIT</span>
+  <button class="bait" data-bait="plancton"><i>✺</i>PLANKTON<kbd>1</kbd></button>
   <button class="bait" data-bait="pellet"><i>●</i>PELLETS<kbd>2</kbd></button>
-  <button class="bait" data-bait="carnada"><i>◆</i>CARNADA<kbd>3</kbd></button>
-  <button class="bait" data-bait="luz"><i>✦</i>LUZ<kbd>4</kbd></button>
+  <button class="bait" data-bait="carnada"><i>◆</i>CHUM<kbd>3</kbd></button>
+  <button class="bait" data-bait="luz"><i>✦</i>LIGHT<kbd>4</kbd></button>
 </div>
 
 <!-- etiqueta de seguimiento -->
-<div id="followTag" hidden>◉&nbsp;SIGUIENDO: <b id="followName">—</b>&nbsp;·&nbsp;ESC o doble clic para soltar</div>
+<div id="followTag" hidden>◉&nbsp;FOLLOWING: <b id="followName">—</b>&nbsp;·&nbsp;ESC or double-click to let go</div>
 
-<!-- pista inicial -->
-<div id="hint">Observa las criaturas para registrarlas&nbsp;·&nbsp;pulsa <b>C</b> y fotografíalas&nbsp;·&nbsp;toca el agua para dar de comer</div>
+<!-- pista inicial (la escribe applyMode) -->
+<div id="hint"></div>
 
-<noscript><p class="noscript">Este acuario necesita JavaScript para llenarse de agua.</p></noscript>
+<noscript><p class="noscript">This aquarium needs JavaScript to fill up with water.</p></noscript>
 
-<script src="save.js?v=10"></script>
-<script src="creatures.js?v=10"></script>
-<script src="biomes.js?v=10"></script>
-<script src="audio.js?v=10"></script>
-<script src="album.js?v=10"></script>
-<script src="aquarium.js?v=10"></script>
+<script src="save.js?v=14"></script>
+<script src="ingles.js?v=14"></script>
+<script src="idioma.js?v=14"></script>
+<script src="luz.js?v=14"></script>
+<script src="dibujo.js?v=14"></script>
+<script src="pintores.js?v=14"></script>
+<script src="creatures.js?v=14"></script>
+<script src="biomes.js?v=14"></script>
+<script src="audio.js?v=14"></script>
+<script src="momentos.js?v=14"></script>
+<script src="album.js?v=14"></script>
+<script src="agua.js?v=14"></script>
+<script src="entorno.js?v=14"></script>
+<script src="aquarium.js?v=14"></script>
 </body>
 </html>

@@ -1,7 +1,8 @@
 /* ============================================================
    ACUARIO ABISAL — criaturas
-   Utilidades, registro de especies y clases con dibujo
-   procedural sobre canvas 2D. Cargar antes de aquarium.js.
+   Utilidades, registro de especies y simulación de cada una.
+   Cómo se ven está en dibujo.js (espina) y pintores.js (resto),
+   que se cargan antes.
    ============================================================ */
 'use strict';
 
@@ -170,163 +171,13 @@ class SpineFish {
     }
   }
 
-  /* geometría: tangentes, normales y bordes */
-  geom() {
-    const P = this.spine, n = P.length;
-    const T = [], N = [], L = [], R = [];
-    for (let i = 0; i < n; i++) {
-      const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)];
-      const t = norm(a.x - b.x, a.y - b.y); // apunta hacia la cabeza
-      T.push(t);
-      const nn = { x: -t.y, y: t.x };
-      N.push(nn);
-      const w = this.widths[i];
-      L.push({ x: P[i].x + nn.x * w, y: P[i].y + nn.y * w });
-      R.push({ x: P[i].x - nn.x * w, y: P[i].y - nn.y * w });
-    }
-    return { P, T, N, L, R };
-  }
-
-  bodyPath(ctx, g) {
-    const { P, T, L, R } = g, n = P.length;
-    ctx.beginPath();
-    ctx.moveTo(L[0].x, L[0].y);
-    for (let i = 1; i < n - 1; i++) {
-      const mx = (L[i].x + L[i + 1].x) / 2, my = (L[i].y + L[i + 1].y) / 2;
-      ctx.quadraticCurveTo(L[i].x, L[i].y, mx, my);
-    }
-    ctx.lineTo(P[n - 1].x, P[n - 1].y);
-    for (let i = n - 2; i > 0; i--) {
-      const mx = (R[i].x + R[i - 1].x) / 2, my = (R[i].y + R[i - 1].y) / 2;
-      ctx.quadraticCurveTo(R[i].x, R[i].y, mx, my);
-    }
-    // redondear el morro
-    const snout = { x: P[0].x + T[0].x * this.widths[0] * 1.8, y: P[0].y + T[0].y * this.widths[0] * 1.8 };
-    ctx.quadraticCurveTo(snout.x, snout.y, L[0].x, L[0].y);
-    ctx.closePath();
-  }
-
-  bodyGradient(ctx, top, belly) {
-    const h = this.head();
-    const gr = ctx.createLinearGradient(h.x, h.y - this.maxW * 2.2, h.x, h.y + this.maxW * 2.2);
-    gr.addColorStop(0, top);
-    gr.addColorStop(1, belly);
-    return gr;
-  }
-
-  /* normal que apunta "hacia arriba" en pantalla */
-  up(g, i) {
-    const nn = g.N[i];
-    return nn.y < 0 ? nn : { x: -nn.x, y: -nn.y };
-  }
-
-  draw(ctx) { this.sp.draw(this, ctx, this.geom()); }
+  draw(ctx) { this.sp.draw(this, ctx); }
 
   hit(mx, my) {
     for (let i = 0; i < this.spine.length; i++) {
       if (dist(mx, my, this.spine[i].x, this.spine[i].y) < this.widths[i] + 9) return true;
     }
     return false;
-  }
-}
-
-/* ---------- piezas de dibujo compartidas ---------- */
-function drawFin(ctx, base1, apex, base2, color) {
-  ctx.beginPath();
-  ctx.moveTo(base1.x, base1.y);
-  ctx.quadraticCurveTo(apex.x, apex.y, apex.x, apex.y);
-  ctx.lineTo(apex.x, apex.y);
-  ctx.quadraticCurveTo((apex.x + base2.x) / 2, (apex.y + base2.y) / 2, base2.x, base2.y);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-function sharkFins(fish, ctx, g, color) {
-  const { P, T } = g;
-  const w = fish.maxW;
-  // aleta dorsal
-  const di = 4;
-  const U = fish.up(g, di);
-  const back = { x: -T[di].x, y: -T[di].y };
-  drawFin(ctx,
-    { x: P[di - 1].x + U.x * fish.widths[di - 1] * 0.8, y: P[di - 1].y + U.y * fish.widths[di - 1] * 0.8 },
-    { x: P[di].x + U.x * w * 2.1 + back.x * w * 0.9, y: P[di].y + U.y * w * 2.1 + back.y * w * 0.9 },
-    { x: P[di + 2].x + U.x * fish.widths[di + 2] * 0.6, y: P[di + 2].y + U.y * fish.widths[di + 2] * 0.6 },
-    color);
-  // aleta pectoral
-  const pi = 3;
-  const D = { x: -fish.up(g, pi).x, y: -fish.up(g, pi).y };
-  const backP = { x: -T[pi].x, y: -T[pi].y };
-  const flap = Math.sin(fish.phase * 0.7) * 0.15 + 1;
-  drawFin(ctx,
-    { x: P[pi].x + D.x * fish.widths[pi] * 0.5, y: P[pi].y + D.y * fish.widths[pi] * 0.5 },
-    { x: P[pi].x + D.x * w * 1.7 * flap + backP.x * w * 1.3, y: P[pi].y + D.y * w * 1.7 * flap + backP.y * w * 1.3 },
-    { x: P[pi + 2].x + D.x * fish.widths[pi + 2] * 0.4, y: P[pi + 2].y + D.y * fish.widths[pi + 2] * 0.4 },
-    color);
-  // cola heterocerca (lóbulo superior mayor)
-  const nn = P.length - 1;
-  const tip = P[nn];
-  const td = { x: -T[nn].x, y: -T[nn].y }; // hacia atrás
-  const tailLen = w * 2.7;
-  const rot = (v, a) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
-  let lobeA = rot(td, -0.55), lobeB = rot(td, 0.5);
-  if (lobeA.y > lobeB.y) { const tmp = lobeA; lobeA = lobeB; lobeB = tmp; }
-  const baseT = P[nn - 1];
-  ctx.beginPath();
-  ctx.moveTo(baseT.x, baseT.y);
-  ctx.quadraticCurveTo(tip.x + lobeA.x * tailLen * 0.5, tip.y + lobeA.y * tailLen * 0.5,
-                       tip.x + lobeA.x * tailLen, tip.y + lobeA.y * tailLen);
-  ctx.quadraticCurveTo(tip.x + td.x * tailLen * 0.28, tip.y + td.y * tailLen * 0.28, tip.x, tip.y);
-  ctx.quadraticCurveTo(tip.x + lobeB.x * tailLen * 0.4, tip.y + lobeB.y * tailLen * 0.4,
-                       tip.x + lobeB.x * tailLen * 0.62, tip.y + lobeB.y * tailLen * 0.62);
-  ctx.quadraticCurveTo(tip.x + lobeB.x * tailLen * 0.3, tip.y + lobeB.y * tailLen * 0.3, baseT.x, baseT.y);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-function sharkFace(fish, ctx, g, opts = {}) {
-  const { P, T } = g;
-  const U = fish.up(g, 1);
-  // ojo
-  const eye = { x: P[1].x + U.x * fish.widths[1] * 0.32, y: P[1].y + U.y * fish.widths[1] * 0.32 };
-  ctx.beginPath(); ctx.arc(eye.x, eye.y, fish.maxW * 0.16, 0, TAU);
-  ctx.fillStyle = opts.eye || '#0b1520'; ctx.fill();
-  ctx.beginPath(); ctx.arc(eye.x - 0.8, eye.y - 0.8, fish.maxW * 0.05, 0, TAU);
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
-  // branquias
-  ctx.strokeStyle = opts.gill || 'rgba(10, 25, 40, 0.45)';
-  ctx.lineWidth = 1.2;
-  for (let k = 0; k < 3; k++) {
-    const gi = 2;
-    const gx = P[gi].x - T[gi].x * k * 4, gy = P[gi].y - T[gi].y * k * 4;
-    const un = fish.up(g, gi);
-    ctx.beginPath();
-    ctx.moveTo(gx + un.x * fish.widths[gi] * 0.5, gy + un.y * fish.widths[gi] * 0.5);
-    ctx.lineTo(gx - un.x * fish.widths[gi] * 0.35, gy - un.y * fish.widths[gi] * 0.35);
-    ctx.stroke();
-  }
-  // boca con dientes (como en el boceto)
-  const D = { x: -U.x, y: -U.y };
-  const m0 = { x: P[0].x + T[0].x * fish.widths[0] * 1.2 + D.x * fish.widths[0] * 0.55,
-               y: P[0].y + T[0].y * fish.widths[0] * 1.2 + D.y * fish.widths[0] * 0.55 };
-  const m1 = { x: P[1].x + D.x * fish.widths[1] * 0.8, y: P[1].y + D.y * fish.widths[1] * 0.8 };
-  ctx.strokeStyle = opts.mouth || 'rgba(8, 18, 30, 0.7)';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath(); ctx.moveTo(m0.x, m0.y);
-  ctx.quadraticCurveTo((m0.x + m1.x) / 2, (m0.y + m1.y) / 2 + 2, m1.x, m1.y);
-  ctx.stroke();
-  if (opts.teeth) {
-    ctx.fillStyle = '#f4fbff';
-    const steps = 4;
-    for (let k = 0; k <= steps; k++) {
-      const tt = k / steps;
-      const tx = lerp(m0.x, m1.x, tt), ty = lerp(m0.y, m1.y, tt) + 1;
-      ctx.beginPath();
-      ctx.moveTo(tx - 1.6, ty); ctx.lineTo(tx + 1.6, ty); ctx.lineTo(tx, ty + 3.4);
-      ctx.closePath(); ctx.fill();
-    }
   }
 }
 
@@ -433,28 +284,7 @@ function makeZap(x, y) {
   return {
     x, y, t: 0, dur: 0.45, bolts,
     update(dt) { this.t += dt; return this.t < this.dur; },
-    draw(ctx) {
-      const k = 1 - this.t / this.dur;
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.globalCompositeOperation = 'lighter';
-      // anillo expansivo
-      ctx.beginPath();
-      ctx.arc(0, 0, (this.t / this.dur) * 170, 0, TAU);
-      ctx.strokeStyle = `rgba(150, 230, 255, ${0.4 * k})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      for (const pts of this.bolts) {
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.strokeStyle = `rgba(190, 240, 255, ${0.35 * k})`;
-        ctx.lineWidth = 4; ctx.stroke();
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.9 * k})`;
-        ctx.lineWidth = 1.4; ctx.stroke();
-      }
-      ctx.restore();
-    },
+    draw(ctx) { pintarDescarga(this, ctx); },
   };
 }
 
@@ -468,201 +298,6 @@ function eelProfile(t) {
   if (t < 0.07) return lerp(0.55, 1, t / 0.07);
   if (t < 0.55) return 1 - (t - 0.07) * 0.2;
   return Math.max(0.05, 0.9 - Math.pow((t - 0.55) / 0.45, 1.05) * 0.86);
-}
-
-/* ============================================================
-   dibujos por especie (tiburones)
-   ============================================================ */
-function drawBlanco(fish, ctx, g) {
-  const body = fish.bodyGradient(ctx, '#4a6b85', '#c9dbe6');
-  const finC = '#41607a';
-  sharkFins(fish, ctx, g, finC);
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = body; ctx.fill();
-  ctx.strokeStyle = 'rgba(180, 220, 240, 0.25)'; ctx.lineWidth = 1; ctx.stroke();
-  sharkFace(fish, ctx, g, { teeth: true });
-}
-
-function drawMartillo(fish, ctx, g) {
-  const body = fish.bodyGradient(ctx, '#587a6e', '#cfe3d8');
-  const finC = '#4a6a60';
-  sharkFins(fish, ctx, g, finC);
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = body; ctx.fill();
-  // cabeza en T (estilizada, como el boceto)
-  const { P, T, N } = g;
-  const w0 = fish.widths[0];
-  const cx = P[0].x + T[0].x * w0 * 1.1, cy = P[0].y + T[0].y * w0 * 1.1;
-  const hw = fish.maxW * 1.55, hh = w0 * 0.7;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(Math.atan2(N[0].y, N[0].x));
-  ctx.beginPath();
-  ctx.roundRect(-hw, -hh, hw * 2, hh * 2, hh);
-  ctx.fillStyle = '#587a6e'; ctx.fill();
-  // ojos en los extremos del martillo
-  for (const s of [-1, 1]) {
-    ctx.beginPath(); ctx.arc(s * (hw - hh * 0.8), 0, hh * 0.42, 0, TAU);
-    ctx.fillStyle = '#0b1520'; ctx.fill();
-    ctx.beginPath(); ctx.arc(s * (hw - hh * 0.8) - 0.7, -0.7, hh * 0.15, 0, TAU);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fill();
-  }
-  ctx.restore();
-  sharkFace(fish, ctx, g, { teeth: false, eye: 'rgba(0,0,0,0)' });
-}
-
-function drawEspectro(fish, ctx, g) {
-  const pulse = 0.16 + 0.3 * (0.5 + 0.5 * Math.sin(world.time * 0.24 + fish.seed)) + world.abyssMix * 0.22;
-  const h = fish.head();
-  ctx.save();
-  ctx.globalAlpha = clamp(pulse, 0.08, 0.75);
-  // halo
-  ctx.globalCompositeOperation = 'lighter';
-  const halo = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, fish.len * 0.7);
-  halo.addColorStop(0, 'rgba(140, 235, 255, 0.16)');
-  halo.addColorStop(1, 'rgba(140, 235, 255, 0)');
-  ctx.fillStyle = halo;
-  ctx.fillRect(h.x - fish.len, h.y - fish.len, fish.len * 2, fish.len * 2);
-  ctx.globalCompositeOperation = 'source-over';
-  const body = fish.bodyGradient(ctx, 'rgba(150, 220, 245, 0.55)', 'rgba(235, 252, 255, 0.75)');
-  sharkFins(fish, ctx, g, 'rgba(160, 225, 250, 0.5)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = body; ctx.fill();
-  ctx.strokeStyle = 'rgba(200, 245, 255, 0.8)'; ctx.lineWidth = 1.2; ctx.stroke();
-  sharkFace(fish, ctx, g, { teeth: true, eye: '#0a3a4a', mouth: 'rgba(120, 200, 230, 0.8)' });
-  ctx.restore();
-}
-
-/* ============================================================
-   dibujos por especie (anguilas)
-   ============================================================ */
-function eelDorsalRibbon(fish, ctx, g, color) {
-  const { P } = g, n = P.length;
-  ctx.beginPath();
-  for (let i = 1; i < n - 1; i++) {
-    const U = fish.up(g, i);
-    const ext = fish.widths[i] * (1 + 0.9 * Math.sin(world.time * 6 + i * 0.7 + fish.seed));
-    const px = P[i].x + U.x * ext, py = P[i].y + U.y * ext;
-    if (i === 1) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  }
-  for (let i = n - 2; i >= 1; i--) {
-    const U = fish.up(g, i);
-    ctx.lineTo(P[i].x + U.x * fish.widths[i] * 0.4, P[i].y + U.y * fish.widths[i] * 0.4);
-  }
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-function eelFace(fish, ctx, g, eyeColor) {
-  const { P, T } = g;
-  const U = fish.up(g, 1);
-  const eye = { x: P[1].x + U.x * fish.widths[1] * 0.3, y: P[1].y + U.y * fish.widths[1] * 0.3 };
-  ctx.beginPath(); ctx.arc(eye.x, eye.y, 2.2, 0, TAU);
-  ctx.fillStyle = eyeColor; ctx.fill();
-  ctx.beginPath(); ctx.arc(eye.x, eye.y, 1, 0, TAU);
-  ctx.fillStyle = '#0a1018'; ctx.fill();
-  // boca que se abre y cierra (respiración de morena)
-  const jaw = Math.max(0, Math.sin(world.time * 1.1 + fish.seed)) * 0.45;
-  const D = { x: -U.x, y: -U.y };
-  const tip = { x: P[0].x + T[0].x * fish.widths[0] * 1.6, y: P[0].y + T[0].y * fish.widths[0] * 1.6 };
-  ctx.strokeStyle = 'rgba(10, 20, 25, 0.75)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x - T[0].x * 8 + D.x * jaw * 7, tip.y - T[0].y * 8 + D.y * jaw * 7);
-  ctx.stroke();
-}
-
-function drawMorena(fish, ctx, g) {
-  eelDorsalRibbon(fish, ctx, g, 'rgba(78, 110, 60, 0.55)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#5d7a3f', '#a8b86a');
-  ctx.fill();
-  // moteado
-  ctx.fillStyle = 'rgba(46, 62, 30, 0.5)';
-  for (let i = 2; i < g.P.length - 2; i += 2) {
-    const off = Math.sin(i * 2.7 + fish.seed) * fish.widths[i] * 0.35;
-    ctx.beginPath();
-    ctx.arc(g.P[i].x + g.N[i].x * off, g.P[i].y + g.N[i].y * off, fish.widths[i] * 0.32, 0, TAU);
-    ctx.fill();
-  }
-  eelFace(fish, ctx, g, '#ffd94a');
-}
-
-function drawElectrica(fish, ctx, g) {
-  eelDorsalRibbon(fish, ctx, g, 'rgba(160, 140, 60, 0.4)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#5c6136', '#d8b45a');
-  ctx.fill();
-  // chispas residuales si acaba de descargar
-  const since = world.time - fish.lastZap;
-  if (since < 1.2) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = `rgba(190, 240, 255, ${0.6 * (1 - since / 1.2)})`;
-    ctx.lineWidth = 1;
-    for (let i = 2; i < g.P.length - 2; i += 3) {
-      ctx.beginPath();
-      ctx.moveTo(g.P[i].x, g.P[i].y);
-      ctx.lineTo(g.P[i].x + rand(-8, 8), g.P[i].y + rand(-8, 8));
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-  eelFace(fish, ctx, g, '#ffe9a0');
-}
-
-function drawNeon(fish, ctx, g) {
-  const { P } = g, n = P.length;
-  const h = fish.head();
-  ctx.save();
-  // halo
-  ctx.globalCompositeOperation = 'lighter';
-  const glow = 0.25 + world.abyssMix * 0.5;
-  const halo = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, fish.len * 0.55);
-  halo.addColorStop(0, `rgba(97, 228, 255, ${glow * 0.35})`);
-  halo.addColorStop(1, 'rgba(97, 228, 255, 0)');
-  ctx.fillStyle = halo;
-  ctx.fillRect(h.x - fish.len, h.y - fish.len, fish.len * 2, fish.len * 2);
-  // cuerpo: trazo con degradado iridiscente a lo largo de la espina
-  const tail = P[n - 1];
-  const gr = ctx.createLinearGradient(h.x, h.y, tail.x, tail.y);
-  const hue0 = (world.time * 40 + fish.seed * 60) % 360;
-  for (let s = 0; s <= 4; s++) {
-    gr.addColorStop(s / 4, `hsla(${(hue0 + s * 46) % 360}, 95%, 65%, 0.95)`);
-  }
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  // estela ancha tenue
-  ctx.strokeStyle = gr; ctx.globalAlpha = 0.22 + world.abyssMix * 0.2;
-  ctx.lineWidth = fish.maxW * 3.4;
-  ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
-  for (let i = 1; i < n; i++) ctx.lineTo(P[i].x, P[i].y);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-  // núcleo del cuerpo
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = '#0d1b2e'; ctx.fill();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.strokeStyle = gr;
-  ctx.lineWidth = fish.maxW * 1.15;
-  ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
-  for (let i = 1; i < n; i++) ctx.lineTo(P[i].x, P[i].y);
-  ctx.stroke();
-  ctx.restore();
-  // ojo brillante
-  ctx.beginPath(); ctx.arc(P[1].x, P[1].y - 2, 2, 0, TAU);
-  ctx.fillStyle = '#fff'; ctx.fill();
-  // chispas de la cola
-  if (Math.random() < 0.35) {
-    world.sparks.push({
-      x: tail.x, y: tail.y,
-      vx: rand(-8, 8), vy: rand(-14, 2),
-      life: rand(0.6, 1.3), age: 0,
-      hue: (hue0 + 180) % 360,
-    });
-  }
 }
 
 /* ============================================================
@@ -767,42 +402,7 @@ class Sardina {
       this.x = clamp(this.x, -80, world.W + 80);
     }
   }
-  draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(Math.atan2(this.vel.y, this.vel.x));
-    const L = this.len;
-    const flap = Math.sin(world.time * 13 + this.seed * 7);
-    // cola
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.4, 0);
-    ctx.lineTo(-L * 0.8, flap * L * 0.28 - L * 0.18);
-    ctx.lineTo(-L * 0.8, flap * L * 0.28 + L * 0.18);
-    ctx.closePath();
-    ctx.fillStyle = `hsl(${this.hue}, 65%, 38%)`;
-    ctx.fill();
-    // cuerpo
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.5, L * 0.21, 0, 0, TAU);
-    ctx.fillStyle = `hsl(${this.hue}, 70%, 48%)`;
-    ctx.fill();
-    // vientre claro
-    ctx.beginPath();
-    ctx.ellipse(L * 0.05, L * 0.06, L * 0.36, L * 0.1, 0, 0, TAU);
-    ctx.fillStyle = `hsla(${this.hue}, 60%, 72%, 0.7)`;
-    ctx.fill();
-    // ojo
-    ctx.beginPath(); ctx.arc(L * 0.3, -L * 0.04, 1.3, 0, TAU);
-    ctx.fillStyle = '#081018'; ctx.fill();
-    // punto bioluminiscente en modo abisal
-    if (world.abyssMix > 0.05) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, TAU);
-      ctx.fillStyle = `rgba(120, 255, 200, ${0.7 * world.abyssMix})`;
-      ctx.fill();
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.sardina(this, ctx); }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 14; }
 }
 
@@ -845,49 +445,7 @@ class Medusa {
     this.x = clamp(this.x, 30, world.W - 30);
     this.alpha = this.fade * clamp((this.y - 66) / 60, 0, 1);
   }
-  draw(ctx) {
-    const s = Math.sin(this.pulse);
-    const rw = this.r * (1 + 0.13 * s), rh = this.r * (0.7 - 0.12 * s);
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // tentáculos
-    ctx.strokeStyle = `rgba(190, 160, 255, ${0.35 + world.abyssMix * 0.2})`;
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 5; i++) {
-      const ox = (i - 2) * rw * 0.4;
-      const sway = Math.sin(world.time * 1.3 + this.seed + i) * 10;
-      ctx.beginPath();
-      ctx.moveTo(ox, rh * 0.4);
-      ctx.bezierCurveTo(ox + sway * 0.3, rh + this.r * 0.8,
-                        ox + sway, rh + this.r * 1.6,
-                        ox + sway * 1.4, rh + this.r * 2.2);
-      ctx.stroke();
-    }
-    // campana
-    const glow = 0.5 + world.abyssMix * 0.3;
-    const gr = ctx.createRadialGradient(0, -rh * 0.2, 0, 0, 0, rw);
-    gr.addColorStop(0, `rgba(230, 210, 255, ${0.5 * glow})`);
-    gr.addColorStop(0.7, `rgba(180, 150, 250, ${0.3 * glow})`);
-    gr.addColorStop(1, `rgba(150, 120, 240, ${0.12 * glow})`);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rw, rh, 0, Math.PI, 0);
-    ctx.quadraticCurveTo(rw * 0.6, rh * 0.55, 0, rh * 0.5);
-    ctx.quadraticCurveTo(-rw * 0.6, rh * 0.55, -rw, 0);
-    ctx.fillStyle = gr;
-    ctx.fill();
-    ctx.strokeStyle = `rgba(220, 200, 255, ${0.5 * glow})`;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-    // órganos en trébol
-    ctx.fillStyle = `rgba(255, 170, 220, ${0.4 * glow})`;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU + 0.4;
-      ctx.beginPath();
-      ctx.ellipse(Math.cos(a) * rw * 0.25, -rh * 0.15 + Math.sin(a) * rh * 0.2, rw * 0.13, rh * 0.16, a, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.medusa(this, ctx); }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 8; }
 }
 
@@ -919,40 +477,7 @@ class Estrella {
     this.x += Math.sin(world.time * 0.05 + this.seed) * 0.4 * dt; // arrastre glacial
     this.y = world.floorY(this.x) - this.r * 0.28 + (1 - this.emerge) * this.r * 0.6;
   }
-  draw(ctx) {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rot + Math.sin(world.time * 0.3 + this.seed) * 0.03);
-    const R = this.r, r = R * 0.45;
-    ctx.beginPath();
-    for (let i = 0; i < 5; i++) {
-      const a0 = (i / 5) * TAU - Math.PI / 2;
-      const a1 = a0 + TAU / 10;
-      const ox = Math.cos(a0) * R, oy = Math.sin(a0) * R;
-      const ix = Math.cos(a1) * r, iy = Math.sin(a1) * r;
-      if (i === 0) ctx.moveTo(ox, oy);
-      else ctx.lineTo(ox, oy);
-      ctx.quadraticCurveTo(ix * 1.15, iy * 1.15,
-        Math.cos(a1 + TAU / 10) * R, Math.sin(a1 + TAU / 10) * R);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#f59f3b';
-    ctx.fill();
-    ctx.strokeStyle = '#b06a1e';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    // textura de bultitos
-    ctx.fillStyle = 'rgba(255, 220, 160, 0.65)';
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * TAU - Math.PI / 2;
-      for (let k = 1; k <= 2; k++) {
-        ctx.beginPath();
-        ctx.arc(Math.cos(a) * R * 0.3 * k, Math.sin(a) * R * 0.3 * k, 1.4, 0, TAU);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.estrella(this, ctx); }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 6; }
 }
 
@@ -999,64 +524,7 @@ class Faroluz {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 60, world.floorY(this.x) - 20);
   }
-  draw(ctx) {
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    const L = this.len;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(dir, 1);
-    ctx.rotate(Math.atan2(this.vel.y, Math.abs(this.vel.x)) * 0.5);
-    // farol
-    const bx = L * 0.62, by = -L * 0.55;
-    const flick = 0.72 + 0.28 * Math.sin(world.time * 11 + this.seed * 9);
-    const glowR = (11 + world.abyssMix * 16) * flick;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const gl = ctx.createRadialGradient(bx, by, 0, bx, by, glowR);
-    gl.addColorStop(0, `rgba(255, 230, 150, ${0.85 * flick})`);
-    gl.addColorStop(0.4, `rgba(255, 190, 90, ${0.35 * flick})`);
-    gl.addColorStop(1, 'rgba(255, 180, 84, 0)');
-    ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(bx, by, glowR, 0, TAU); ctx.fill();
-    ctx.restore();
-    // antena
-    ctx.strokeStyle = '#2a2f55';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(L * 0.25, -L * 0.16);
-    ctx.quadraticCurveTo(L * 0.3, -L * 0.72, bx, by);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(bx, by, 2.4, 0, TAU);
-    ctx.fillStyle = '#ffe9a0'; ctx.fill();
-    // cola
-    const flap = Math.sin(world.time * 9 + this.seed * 5);
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.4, 0);
-    ctx.lineTo(-L * 0.72, flap * L * 0.2 - L * 0.2);
-    ctx.lineTo(-L * 0.72, flap * L * 0.2 + L * 0.2);
-    ctx.closePath();
-    ctx.fillStyle = '#232850';
-    ctx.fill();
-    // cuerpo regordete
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.46, L * 0.34, 0, 0, TAU);
-    ctx.fillStyle = '#1b1f42';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(140, 160, 255, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // ojo enorme
-    ctx.beginPath(); ctx.arc(L * 0.2, -L * 0.06, L * 0.13, 0, TAU);
-    ctx.fillStyle = '#eef6ff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(L * 0.23, -L * 0.06, L * 0.06, 0, TAU);
-    ctx.fillStyle = '#0a1020'; ctx.fill();
-    // dientecillos
-    ctx.fillStyle = '#eef6ff';
-    ctx.beginPath();
-    ctx.moveTo(L * 0.42, L * 0.1); ctx.lineTo(L * 0.36, L * 0.2); ctx.lineTo(L * 0.3, L * 0.1);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.faroluz(this, ctx); }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.7; }
 }
 
@@ -1100,56 +568,7 @@ class Buzo {
       this.nextBubble = t + rand(1.2, 2.8);
     }
   }
-  draw(ctx) {
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir * 1.35, 1.35);
-    ctx.rotate(Math.sin(t * 0.8 + this.seed) * 0.05);
-    const kick = Math.sin(t * 3.2 + this.seed);
-    ctx.lineCap = 'round';
-    // tanque
-    ctx.beginPath(); ctx.roundRect(-15, -12, 9, 24, 4);
-    ctx.fillStyle = '#d8a03c'; ctx.fill();
-    ctx.strokeStyle = '#8a621f'; ctx.lineWidth = 1; ctx.stroke();
-    // piernas con aletas
-    ctx.strokeStyle = '#14293e'; ctx.lineWidth = 5;
-    for (const s of [-1, 1]) {
-      const ky = 20 + kick * 3 * s;
-      ctx.beginPath(); ctx.moveTo(-2, 12); ctx.lineTo(-13, ky); ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(-13, ky - 2); ctx.lineTo(-24, ky + kick * 2 * s); ctx.lineTo(-13, ky + 3);
-      ctx.closePath(); ctx.fillStyle = '#0e1e30'; ctx.fill();
-    }
-    // cuerpo
-    ctx.beginPath(); ctx.roundRect(-9, -14, 20, 28, 9);
-    ctx.fillStyle = '#16324a'; ctx.fill();
-    ctx.strokeStyle = '#2c5a7a'; ctx.lineWidth = 1.2; ctx.stroke();
-    // brazo
-    ctx.strokeStyle = '#16324a'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(4, -3);
-    ctx.lineTo(15, 5 + Math.sin(t * 1.7 + this.seed) * 3);
-    ctx.stroke();
-    // casco
-    ctx.beginPath(); ctx.arc(7, -20, 9.5, 0, TAU);
-    ctx.fillStyle = '#c8d4dc'; ctx.fill();
-    ctx.strokeStyle = '#7e929e'; ctx.lineWidth = 1.2; ctx.stroke();
-    // visor
-    ctx.beginPath(); ctx.arc(10, -20, 6.5, -1.1, 1.4);
-    ctx.lineTo(10, -20);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(120, 220, 255, 0.85)'; ctx.fill();
-    // brillo del visor
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.arc(10, -20, 4.5, -0.9, -0.2); ctx.stroke();
-    // manguera
-    ctx.strokeStyle = '#3d5568'; ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(2, -24);
-    ctx.bezierCurveTo(-6, -28, -12, -20, -11, -12);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.buzo(this, ctx); }
   head() { return { x: this.x, y: this.y - 22 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y - 8) < 36; }
 }
@@ -1184,56 +603,6 @@ function restBehavior(fish, f, dt) {
     fish.speedMul = 1;
     fish.wiggleMul = 1;
   }
-}
-
-function drawPuntasBlancas(fish, ctx, g) {
-  const finC = '#6a7a64';
-  sharkFins(fish, ctx, g, finC);
-  // puntas blancas: manchas en el ápice dorsal y el lóbulo de la cola
-  const { P, T } = g;
-  const w = fish.maxW;
-  const di = 4;
-  const U = fish.up(g, di);
-  const back = { x: -T[di].x, y: -T[di].y };
-  ctx.fillStyle = 'rgba(240, 248, 240, 0.95)';
-  ctx.beginPath();
-  ctx.arc(P[di].x + U.x * w * 2.0 + back.x * w * 0.9, P[di].y + U.y * w * 2.0 + back.y * w * 0.9, w * 0.42, 0, TAU);
-  ctx.fill();
-  const nn = P.length - 1;
-  const td = { x: -T[nn].x, y: -T[nn].y };
-  const rot = (v, a) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
-  let lobe = rot(td, -0.55);
-  if (lobe.y > 0) lobe = rot(td, 0.5);
-  ctx.beginPath();
-  ctx.arc(P[nn].x + lobe.x * w * 2.5, P[nn].y + lobe.y * w * 2.5, w * 0.36, 0, TAU);
-  ctx.fill();
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#7d8a75', '#dde3d6');
-  ctx.fill();
-  sharkFace(fish, ctx, g, { teeth: false });
-}
-
-/* anguila cinta azul */
-function drawCinta(fish, ctx, g) {
-  eelDorsalRibbon(fish, ctx, g, 'rgba(255, 214, 60, 0.8)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#1d4fd8', '#5b9bff');
-  ctx.fill();
-  // hocico amarillo con apéndices nasales
-  const { P, T } = g;
-  const tip = { x: P[0].x + T[0].x * fish.widths[0] * 1.5, y: P[0].y + T[0].y * fish.widths[0] * 1.5 };
-  ctx.fillStyle = '#ffd63c';
-  ctx.beginPath(); ctx.arc(tip.x, tip.y, fish.widths[0] * 0.9, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#ffd63c'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-  const U0 = fish.up(g, 0);
-  const flare = Math.sin(world.time * 2.4 + fish.seed) * 2;
-  ctx.beginPath();
-  ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x + T[0].x * 7 + U0.x * (5 + flare), tip.y + T[0].y * 7 + U0.y * (5 + flare));
-  ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x + T[0].x * 7 - U0.x * (5 - flare), tip.y + T[0].y * 7 - U0.y * (5 - flare));
-  ctx.stroke();
-  eelFace(fish, ctx, g, '#ffe9a0');
 }
 
 /* ---------- PULPO DE ARRECIFE — se camufla ---------- */
@@ -1271,40 +640,7 @@ class Pulpo {
     const scared = m.active && dist(m.x, m.y, this.x, this.y) < 75;
     this.calm = clamp(this.calm + ((moving || scared) ? -2.2 : 0.45) * dt, 0, 1);
   }
-  draw(ctx) {
-    const t = world.time;
-    const body = mixRgb(this.baseRgb, this.sandRgb, this.calm * 0.8);
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // tentáculos
-    ctx.strokeStyle = body;
-    ctx.lineCap = 'round';
-    for (let i = 0; i < 5; i++) {
-      const spread = (i - 2) * 0.5;
-      const curl = Math.sin(t * 1.8 + this.seed + i * 1.7) * 6;
-      ctx.lineWidth = 3.4 - Math.abs(spread);
-      ctx.beginPath();
-      ctx.moveTo(spread * 4, this.r * 0.4);
-      ctx.bezierCurveTo(
-        spread * this.r * 0.9, this.r * 0.9,
-        spread * this.r * 1.3 + curl, this.r * 1.05,
-        spread * this.r * 1.5 + curl * 1.6, this.r * 0.8 + Math.abs(spread) * 2);
-      ctx.stroke();
-    }
-    // manto
-    ctx.beginPath();
-    ctx.ellipse(0, -this.r * 0.25, this.r * 0.95, this.r * 0.8, 0, 0, TAU);
-    ctx.fillStyle = body;
-    ctx.fill();
-    // ojos con pupila horizontal
-    for (const s of [-1, 1]) {
-      ctx.beginPath(); ctx.arc(s * this.r * 0.42, -this.r * 0.6, this.r * 0.2, 0, TAU);
-      ctx.fillStyle = '#e8dfc8'; ctx.fill();
-      ctx.fillStyle = '#20140e';
-      ctx.fillRect(s * this.r * 0.42 - this.r * 0.13, -this.r * 0.63, this.r * 0.26, this.r * 0.09);
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.pulpo(this, ctx); }
   head() { return { x: this.x, y: this.y - this.r * 0.5 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 12; }
 }
@@ -1331,42 +667,7 @@ class Raya {
     this.y = world.floorY(this.x) - this.hover + Math.sin(t * 1.4 + this.seed) * 4;
     this.vel.x = this.dir;
   }
-  draw(ctx) {
-    const t = world.time;
-    const L = 62;
-    const flap = Math.sin(t * 2.6 + this.seed);
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir, 1);
-    // cola látigo
-    ctx.strokeStyle = '#5d6b78';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.45, 0);
-    ctx.bezierCurveTo(-L * 0.9, -2, -L * 1.15, flap * 5 - 4, -L * 1.45, flap * 9);
-    ctx.stroke();
-    // ala que ondula (vista de perfil)
-    const g1 = ctx.createLinearGradient(0, -L * 0.35, 0, L * 0.2);
-    g1.addColorStop(0, '#79878f');
-    g1.addColorStop(1, '#c9d4d4');
-    ctx.beginPath();
-    ctx.moveTo(L * 0.5, 0);
-    ctx.quadraticCurveTo(L * 0.15, -L * 0.42 - flap * 6, -L * 0.3, -L * 0.06);
-    ctx.quadraticCurveTo(-L * 0.45, 0, -L * 0.3, L * 0.05);
-    ctx.quadraticCurveTo(L * 0.05, L * 0.22 + flap * 3, L * 0.5, 0);
-    ctx.closePath();
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(40, 55, 65, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // ojo saltón
-    ctx.beginPath(); ctx.arc(L * 0.3, -L * 0.1, 2.6, 0, TAU);
-    ctx.fillStyle = '#0b1520'; ctx.fill();
-    ctx.beginPath(); ctx.arc(L * 0.3 - 0.8, -L * 0.11, 0.9, 0, TAU);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.raya(this, ctx); }
   head() { return { x: this.x + this.dir * 20, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 42; }
 }
@@ -1416,41 +717,7 @@ class PezPayaso {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 60, world.floorY(this.x) - 8);
   }
-  draw(ctx) {
-    const L = this.len;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(Math.atan2(this.vel.y, this.vel.x));
-    if (this.vel.x < 0) ctx.scale(1, -1); // no nadar boca abajo
-    const flap = Math.sin(world.time * 11 + this.seed * 7);
-    // cola
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.35, 0);
-    ctx.lineTo(-L * 0.72, flap * L * 0.22 - L * 0.22);
-    ctx.lineTo(-L * 0.72, flap * L * 0.22 + L * 0.22);
-    ctx.closePath();
-    ctx.fillStyle = '#e8641f';
-    ctx.fill();
-    // cuerpo
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.52, L * 0.3, 0, 0, TAU);
-    ctx.fillStyle = '#f47a2b';
-    ctx.fill();
-    // bandas blancas con borde negro
-    ctx.lineWidth = 0.8;
-    for (const bx of [L * 0.2, -L * 0.18]) {
-      ctx.beginPath();
-      ctx.ellipse(bx, 0, L * 0.09, L * 0.3, 0, 0, TAU);
-      ctx.fillStyle = '#f6f2e8';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(30, 20, 10, 0.55)';
-      ctx.stroke();
-    }
-    // ojo
-    ctx.beginPath(); ctx.arc(L * 0.34, -L * 0.05, 1.6, 0, TAU);
-    ctx.fillStyle = '#170f08'; ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.payaso(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 16; }
 }
@@ -1489,53 +756,7 @@ class Ermitano {
     if (this.hide < 0.5) this.x += this.dir * walk * dt;
     this.y = world.floorY(this.x) - 5;
   }
-  draw(ctx) {
-    const t = world.time;
-    const out = 1 - this.hide;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir, 1);
-    // patas
-    if (out > 0.1) {
-      ctx.strokeStyle = '#c26a3a';
-      ctx.lineWidth = 1.6;
-      ctx.lineCap = 'round';
-      for (let i = 0; i < 3; i++) {
-        const step = Math.sin(t * 9 + i * 2.1 + this.seed) * 2.5 * out;
-        ctx.beginPath();
-        ctx.moveTo(4 + i * 2.5, 0);
-        ctx.lineTo(7 + i * 3.5 + step, 5);
-        ctx.stroke();
-      }
-      // ojos con pedúnculo
-      ctx.beginPath(); ctx.moveTo(8, -3 * out); ctx.lineTo(9, -8 * out);
-      ctx.moveTo(11, -3 * out); ctx.lineTo(12.5, -7.5 * out);
-      ctx.stroke();
-      ctx.fillStyle = '#20140e';
-      ctx.beginPath(); ctx.arc(9, -8.5 * out, 1.3, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(12.5, -8 * out, 1.3, 0, TAU); ctx.fill();
-      // pinza
-      ctx.fillStyle = '#d1793f';
-      ctx.beginPath();
-      ctx.ellipse(11 + out * 2, 2, 3.4, 2.2, 0.4, 0, TAU);
-      ctx.fill();
-    }
-    // concha en espiral
-    const g1 = ctx.createLinearGradient(0, -12, 0, 2);
-    g1.addColorStop(0, '#c9a878');
-    g1.addColorStop(1, '#8a6a48');
-    ctx.beginPath();
-    ctx.ellipse(-2, -5.5, 9.5, 7.5, -0.2, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(70, 48, 28, 0.6)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(-3.5, -6, 4, 0.4, TAU * 0.85);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.ermitano(this, ctx); }
   head() { return { x: this.x, y: this.y - 8 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y - 4) < 16; }
 }
@@ -1592,40 +813,7 @@ class PezEspejo {
       this.tint = this.tint.map((v0, i) => lerp(v0, target[i], k));
     }
   }
-  draw(ctx) {
-    const L = this.len;
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(Math.atan2(this.vel.y, this.vel.x));
-    if (this.vel.x < 0) ctx.scale(1, -1);
-    const flap = Math.sin(t * 10 + this.seed * 5);
-    // cola
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.38, 0);
-    ctx.lineTo(-L * 0.75, flap * L * 0.2 - L * 0.22);
-    ctx.lineTo(-L * 0.75, flap * L * 0.2 + L * 0.22);
-    ctx.closePath();
-    ctx.fillStyle = mixRgb(this.tint, [235, 245, 250], 0.3);
-    ctx.fill();
-    // cuerpo cromado: barrido especular animado
-    const sweep = (Math.sin(t * 1.7 + this.seed) + 1) / 2;
-    const g1 = ctx.createLinearGradient(-L * 0.5, -L * 0.3, L * 0.5, L * 0.3);
-    g1.addColorStop(0, mixRgb(this.tint, [255, 255, 255], 0.15));
-    g1.addColorStop(clamp(sweep, 0.05, 0.95), '#f4fbff');
-    g1.addColorStop(1, mixRgb(this.tint, [30, 45, 60], 0.35));
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.52, L * 0.3, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // ojo
-    ctx.beginPath(); ctx.arc(L * 0.32, -L * 0.05, 1.8, 0, TAU);
-    ctx.fillStyle = '#0a1018'; ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.espejo(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.7; }
 }
@@ -1659,51 +847,7 @@ class AnguilaJardin {
     this.y = world.floorY(this.x) - this.h * 0.5;
   }
   out() { return this.emerge * (1 - this.shy * 0.92); }
-  draw(ctx) {
-    const out = this.out();
-    const base = (this.baseY ?? world.floorY(this.x)) + 2; // baseY: pose de retrato
-    if (out < 0.03) {
-      // solo el hocico asomando, vigilante
-      ctx.fillStyle = '#cfc8b2';
-      ctx.beginPath(); ctx.arc(this.x, base - 2, 1.6, 0, TAU); ctx.fill();
-      return;
-    }
-    const t = world.time;
-    const H = this.h * out;
-    const segs = 8;
-    ctx.save();
-    ctx.lineCap = 'round';
-    let px = this.x, py = base;
-    const pts = [{ x: px, y: py }];
-    for (let i = 1; i <= segs; i++) {
-      const tt = i / segs;
-      pts.push({
-        x: this.x + Math.sin(t * 1.15 + this.seed + tt * 2.6) * 7 * tt,
-        y: base - H * tt,
-      });
-    }
-    // el último tramo se curva: el signo de interrogación
-    const tip = pts[segs];
-    tip.x += 4;
-    for (let i = 1; i <= segs; i++) {
-      ctx.strokeStyle = i > segs - 2 ? '#b8b09a' : '#d6cfba';
-      ctx.lineWidth = lerp(3.6, 2.2, i / segs);
-      ctx.beginPath();
-      ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-      ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.stroke();
-    }
-    // moteado
-    ctx.fillStyle = 'rgba(90, 84, 62, 0.5)';
-    for (let i = 1; i < segs; i += 2) {
-      ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, 1.1, 0, TAU); ctx.fill();
-    }
-    // ojos
-    ctx.fillStyle = '#20180e';
-    ctx.beginPath(); ctx.arc(tip.x - 1.2, tip.y - 0.5, 1, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(tip.x + 1.4, tip.y - 0.5, 1, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.jardin(this, ctx); }
   head() { return { x: this.x, y: world.floorY(this.x) - this.h * this.out() }; }
   hit(mx, my) {
     const base = world.floorY(this.x);
@@ -1743,61 +887,7 @@ class Caballito {
     this.y += Math.sin(t * 0.85 + this.seed) * 7 * dt;
     this.y = clamp(this.y, 100, world.floorY(this.x) - 26);
   }
-  draw(ctx) {
-    const L = this.len;
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir, 1);
-    ctx.rotate(Math.sin(t * 0.85 + this.seed) * 0.08);
-    ctx.lineCap = 'round';
-    // aleta dorsal que revolotea
-    const flut = Math.sin(t * 16 + this.seed);
-    ctx.fillStyle = 'rgba(240, 196, 110, 0.65)';
-    ctx.beginPath();
-    ctx.ellipse(-L * 0.26, 0, L * 0.12, L * 0.24, flut * 0.3, 0, TAU);
-    ctx.fill();
-    // cuerpo en S: cabeza arriba, cola en espiral abajo
-    ctx.strokeStyle = '#e0aa4a';
-    ctx.lineWidth = L * 0.24;
-    ctx.beginPath();
-    ctx.moveTo(L * 0.3, -L * 0.42);                       // nuca
-    ctx.quadraticCurveTo(-L * 0.18, -L * 0.28, -L * 0.08, 0);   // pecho
-    ctx.quadraticCurveTo(L * 0.02, L * 0.3, -L * 0.12, L * 0.42); // vientre
-    ctx.stroke();
-    // cola en espiral
-    ctx.lineWidth = L * 0.12;
-    ctx.beginPath();
-    ctx.arc(-L * 0.16, L * 0.44, L * 0.13, -0.6, Math.PI * 1.5);
-    ctx.stroke();
-    ctx.lineWidth = L * 0.07;
-    ctx.beginPath();
-    ctx.arc(-L * 0.14, L * 0.42, L * 0.06, 0.5, Math.PI * 1.8);
-    ctx.stroke();
-    // hocico de trompeta
-    ctx.lineWidth = L * 0.1;
-    ctx.beginPath();
-    ctx.moveTo(L * 0.3, -L * 0.42);
-    ctx.lineTo(L * 0.52, -L * 0.36);
-    ctx.stroke();
-    // corona
-    ctx.lineWidth = L * 0.08;
-    ctx.beginPath();
-    ctx.moveTo(L * 0.24, -L * 0.52);
-    ctx.lineTo(L * 0.3, -L * 0.62);
-    ctx.stroke();
-    // crestas del cuerpo
-    ctx.fillStyle = 'rgba(150, 100, 30, 0.55)';
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath();
-      ctx.arc(-L * 0.06 + Math.sin(i * 1.8) * L * 0.08, -L * 0.2 + i * L * 0.16, 1.2, 0, TAU);
-      ctx.fill();
-    }
-    // ojo
-    ctx.fillStyle = '#241505';
-    ctx.beginPath(); ctx.arc(L * 0.26, -L * 0.4, 1.6, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.caballito(this, ctx); }
   head() { return { x: this.x, y: this.y - this.len * 0.4 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.75; }
 }
@@ -1842,67 +932,7 @@ class PezGlobo {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 70, world.floorY(this.x) - 24);
   }
-  draw(ctx) {
-    const L = this.len;
-    const k = this.inflate;
-    const r = L * (0.34 + 0.34 * k);
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(dir, 1);
-    // cola (se esconde al inflarse)
-    const flap = Math.sin(world.time * 9 + this.seed * 5);
-    ctx.fillStyle = '#b9a25e';
-    ctx.globalAlpha = 1 - k * 0.7;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.9, 0);
-    ctx.lineTo(-r * 1.5, flap * 4 - L * 0.16);
-    ctx.lineTo(-r * 1.5, flap * 4 + L * 0.16);
-    ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = 1;
-    // púas
-    if (k > 0.2) {
-      ctx.strokeStyle = `rgba(120, 100, 50, ${(k - 0.2) * 1.1})`;
-      ctx.lineWidth = 1.6;
-      for (let i = 0; i < 14; i++) {
-        const a = (i / 14) * TAU;
-        const sx = Math.cos(a) * r, sy = Math.sin(a) * r;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(sx * (1 + 0.22 * k), sy * (1 + 0.22 * k));
-        ctx.stroke();
-      }
-    }
-    // cuerpo
-    const g1 = ctx.createLinearGradient(0, -r, 0, r);
-    g1.addColorStop(0, '#c9b573');
-    g1.addColorStop(1, '#f2ead0');
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 1.06, r, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // motas
-    ctx.fillStyle = 'rgba(140, 116, 58, 0.5)';
-    for (let i = 0; i < 6; i++) {
-      const a = i * 1.7 + this.seed;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.4 - r * 0.15, r * 0.09, 0, TAU);
-      ctx.fill();
-    }
-    // ojos grandes (más grandes cuanto más asustado)
-    const er = L * (0.09 + k * 0.05);
-    ctx.fillStyle = '#f8fbff';
-    ctx.beginPath(); ctx.arc(r * 0.5, -r * 0.28, er, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#191007';
-    ctx.beginPath(); ctx.arc(r * 0.54, -r * 0.28, er * 0.55, 0, TAU); ctx.fill();
-    // boquita
-    ctx.strokeStyle = 'rgba(90, 70, 30, 0.8)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(r * 0.92, r * 0.06, L * 0.07, -0.7, 0.7);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.globo(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * (0.4 + this.inflate * 0.35) + 8; }
 }
@@ -1928,67 +958,7 @@ class Tortuga {
     this.y = clamp(this.y, 95, world.floorY(this.x) - 60);
     this.vel.x = this.dir;
   }
-  draw(ctx) {
-    const t = world.time;
-    const stroke = Math.sin(t * 1.7 + this.seed);
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir, 1);
-    ctx.rotate(Math.sin(t * 0.35 + this.seed) * 0.06);
-    // aleta trasera
-    ctx.fillStyle = '#5c8a5e';
-    ctx.beginPath();
-    ctx.ellipse(-30, 8, 11, 5, -0.5 + stroke * 0.15, 0, TAU);
-    ctx.fill();
-    // aleta delantera (remada amplia)
-    ctx.save();
-    ctx.translate(10, 6);
-    ctx.rotate(0.5 + stroke * 0.5);
-    ctx.fillStyle = '#67976a';
-    ctx.beginPath();
-    ctx.ellipse(0, 14, 7, 17, 0.15, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-    // caparazón
-    const g1 = ctx.createLinearGradient(0, -22, 0, 14);
-    g1.addColorStop(0, '#4f7d54');
-    g1.addColorStop(1, '#3a5c44');
-    ctx.beginPath();
-    ctx.ellipse(0, -4, 34, 19, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = '#2c4736';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-    // placas
-    ctx.strokeStyle = 'rgba(32, 54, 40, 0.55)';
-    ctx.lineWidth = 1.2;
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.ellipse(i * 14, -5, 7, 9, 0, 0, TAU);
-      ctx.stroke();
-    }
-    // vientre
-    ctx.fillStyle = '#d9d2ae';
-    ctx.beginPath();
-    ctx.ellipse(2, 12, 26, 6, 0, 0, Math.PI);
-    ctx.fill();
-    // cabeza y cuello
-    ctx.fillStyle = '#6d9c72';
-    ctx.beginPath();
-    ctx.ellipse(38, -6, 11, 8, -0.15, 0, TAU);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(30, -4, 8, 6, 0, 0, TAU);
-    ctx.fill();
-    // ojo y boca
-    ctx.fillStyle = '#1b2416';
-    ctx.beginPath(); ctx.arc(42, -8, 1.8, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(27, 36, 22, 0.7)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath(); ctx.moveTo(46, -4); ctx.lineTo(41, -2); ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.tortuga(this, ctx); }
   head() { return { x: this.x + this.dir * 38, y: this.y - 6 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 44; }
 }
@@ -2040,78 +1010,7 @@ class PezCopa {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 74, world.floorY(this.x) - 18);
   }
-  draw(ctx) {
-    // un pez de cristal: silueta de pez, cuerpo translúcido,
-    // y la gaseosa que ha bebido visible en la barriga
-    const L = this.len;
-    const t = world.time;
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(dir, 1);
-    ctx.rotate(Math.atan2(this.vel.y, Math.abs(this.vel.x)) * 0.4);
-    const flap = Math.sin(t * 8 + this.seed * 3);
-    // cola de vidrio
-    ctx.fillStyle = 'rgba(215, 240, 250, 0.4)';
-    ctx.strokeStyle = 'rgba(240, 250, 255, 0.7)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.42, 0);
-    ctx.lineTo(-L * 0.72, flap * L * 0.18 - L * 0.2);
-    ctx.lineTo(-L * 0.72, flap * L * 0.18 + L * 0.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // aleta dorsal de cristal
-    ctx.fillStyle = 'rgba(220, 242, 252, 0.4)';
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.08, -L * 0.28);
-    ctx.quadraticCurveTo(L * 0.02, -L * 0.52, L * 0.2, -L * 0.28);
-    ctx.closePath();
-    ctx.fill();
-    // cuerpo rechoncho translúcido
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.48, L * 0.33, 0, 0, TAU);
-    ctx.fillStyle = 'rgba(210, 238, 250, 0.2)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(238, 250, 255, 0.8)';
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-    // la gaseosa interior sube de nivel según lo bebido
-    if (this.fill > 0.03) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(0, 0, L * 0.48, L * 0.33, 0, 0, TAU);
-      ctx.clip();
-      const lvl = lerp(L * 0.3, -L * 0.24, this.fill);
-      ctx.fillStyle = 'rgba(255, 205, 110, 0.5)';
-      ctx.fillRect(-L * 0.5, lvl, L, L);
-      ctx.fillStyle = 'rgba(255, 246, 225, 0.75)';
-      for (let i = 0; i < 5; i++) {
-        const bx = Math.sin(i * 2.1 + this.seed) * L * 0.3;
-        const span = L * 0.3 - lvl + 6;
-        const by = L * 0.3 - ((t * 12 + i * 13) % Math.max(6, span));
-        if (by > lvl) { ctx.beginPath(); ctx.arc(bx, by, 0.9, 0, TAU); ctx.fill(); }
-      }
-      ctx.restore();
-    }
-    // brillo del vidrio
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.arc(-L * 0.08, -L * 0.08, L * 0.26, Math.PI * 1.05, Math.PI * 1.55);
-    ctx.stroke();
-    // ojo
-    ctx.fillStyle = '#12303e';
-    ctx.beginPath(); ctx.arc(L * 0.28, -L * 0.07, 1.8, 0, TAU); ctx.fill();
-    // boquita, siempre lista para el siguiente sorbo
-    ctx.strokeStyle = 'rgba(130, 170, 190, 0.85)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(L * 0.47, 0, L * 0.05, -0.8, 0.8);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.copa(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.7; }
 }
@@ -2154,43 +1053,7 @@ class MedusaSifon {
     this.x = clamp(this.x, 30, world.W - 30);
     this.alpha = this.fade * clamp((this.y - 74) / 50, 0, 1);
   }
-  draw(ctx) {
-    const s = Math.sin(this.pulse);
-    const rw = this.r * (1 + 0.18 * s), rh = this.r * (0.75 - 0.16 * s);
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.globalCompositeOperation = 'lighter';
-    // campana de gas
-    const gr = ctx.createRadialGradient(0, -rh * 0.2, 0, 0, 0, rw);
-    gr.addColorStop(0, 'rgba(200, 250, 255, 0.4)');
-    gr.addColorStop(0.75, 'rgba(160, 230, 250, 0.16)');
-    gr.addColorStop(1, 'rgba(160, 230, 250, 0)');
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rw, rh, 0, Math.PI, 0);
-    ctx.quadraticCurveTo(rw * 0.5, rh * 0.5, 0, rh * 0.42);
-    ctx.quadraticCurveTo(-rw * 0.5, rh * 0.5, -rw, 0);
-    ctx.fillStyle = gr;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(220, 250, 255, 0.55)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // burbujas atrapadas dentro
-    ctx.fillStyle = 'rgba(240, 252, 255, 0.5)';
-    for (let i = 0; i < 3; i++) {
-      const a = i * 2.2 + this.seed;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * rw * 0.35, -rh * 0.25 + Math.sin(a + world.time) * rh * 0.2, 1.4, 0, TAU);
-      ctx.fill();
-    }
-    // colita de sifón
-    ctx.strokeStyle = 'rgba(190, 240, 255, 0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(0, rh * 0.42);
-    ctx.quadraticCurveTo(Math.sin(world.time * 1.6 + this.seed) * 6, rh + this.r * 0.9, 0, rh + this.r * 1.4);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.sifon(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 9; }
 }
@@ -2198,25 +1061,6 @@ class MedusaSifon {
 /* anguila sacacorchos (ficticia): nada en hélice */
 function sacacorchosBehavior(fish, f) {
   f.y += Math.sin(world.time * 2.6 + fish.seed) * 2.4; // la hélice
-}
-
-function drawSacacorchos(fish, ctx, g) {
-  eelDorsalRibbon(fish, ctx, g, 'rgba(244, 216, 180, 0.5)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#c9a183', '#f2e2c8');
-  ctx.fill();
-  // franja en espiral: gira a lo largo del cuerpo
-  ctx.fillStyle = 'rgba(150, 96, 60, 0.55)';
-  for (let i = 1; i < g.P.length - 1; i++) {
-    const roll = Math.sin(i * 0.9 - world.time * 4 + fish.seed);
-    ctx.beginPath();
-    ctx.arc(
-      g.P[i].x + g.N[i].x * fish.widths[i] * 0.55 * roll,
-      g.P[i].y + g.N[i].y * fish.widths[i] * 0.55 * roll,
-      fish.widths[i] * 0.3, 0, TAU);
-    ctx.fill();
-  }
-  eelFace(fish, ctx, g, '#5c3a20');
 }
 
 /* ============================================================
@@ -2267,79 +1111,7 @@ class Rape {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 80, world.floorY(this.x) - 18);
   }
-  draw(ctx) {
-    const L = this.len;
-    const t = world.time;
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(dir, 1);
-    // señuelo: luz verdosa de bacterias
-    const bx = L * 0.5, by = -L * 0.5;
-    const flick = 0.7 + 0.3 * Math.sin(t * 7 + this.seed * 9);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const gl = ctx.createRadialGradient(bx, by, 0, bx, by, 20 * flick);
-    gl.addColorStop(0, `rgba(190, 255, 216, ${0.9 * flick})`);
-    gl.addColorStop(0.4, `rgba(130, 240, 190, ${0.3 * flick})`);
-    gl.addColorStop(1, 'rgba(130, 240, 190, 0)');
-    ctx.fillStyle = gl;
-    ctx.beginPath(); ctx.arc(bx, by, 20 * flick, 0, TAU); ctx.fill();
-    ctx.restore();
-    // caña
-    ctx.strokeStyle = '#3a2634';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(L * 0.14, -L * 0.24);
-    ctx.quadraticCurveTo(L * 0.2, -L * 0.66, bx, by);
-    ctx.stroke();
-    ctx.fillStyle = '#d8ffe8';
-    ctx.beginPath(); ctx.arc(bx, by, 2.6, 0, TAU); ctx.fill();
-    // cola
-    const flap = Math.sin(t * 6 + this.seed * 5);
-    ctx.fillStyle = '#241a25';
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.36, 0);
-    ctx.lineTo(-L * 0.64, flap * L * 0.16 - L * 0.18);
-    ctx.lineTo(-L * 0.64, flap * L * 0.16 + L * 0.18);
-    ctx.closePath(); ctx.fill();
-    // cuerpo: globo malhumorado
-    const g1 = ctx.createLinearGradient(0, -L * 0.36, 0, L * 0.36);
-    g1.addColorStop(0, '#33222f');
-    g1.addColorStop(1, '#1d141d');
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.5, L * 0.38, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // bocaza con colmillos
-    const gape = 0.5 + 0.2 * Math.sin(t * 1.3 + this.seed);
-    ctx.fillStyle = '#0c070c';
-    ctx.beginPath();
-    ctx.moveTo(L * 0.48, -L * 0.04);
-    ctx.quadraticCurveTo(L * 0.2, L * 0.1 * gape + L * 0.08, L * 0.44, L * 0.26 * gape);
-    ctx.quadraticCurveTo(L * 0.52, L * 0.12, L * 0.48, -L * 0.04);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#e8f4f0';
-    for (let i = 0; i < 4; i++) {
-      const tx = L * (0.44 - i * 0.07);
-      ctx.beginPath();
-      ctx.moveTo(tx, -L * 0.02 + i * L * 0.008);
-      ctx.lineTo(tx - 1.4, L * 0.09);
-      ctx.lineTo(tx - 2.8, -L * 0.02 + i * L * 0.008);
-      ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(tx - 1, L * 0.24 * gape);
-      ctx.lineTo(tx - 2.4, L * 0.1);
-      ctx.lineTo(tx - 3.8, L * 0.24 * gape);
-      ctx.closePath(); ctx.fill();
-    }
-    // ojito diminuto y desproporcionado
-    ctx.fillStyle = '#cfe8dd';
-    ctx.beginPath(); ctx.arc(L * 0.22, -L * 0.16, 2, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#0a0a0a';
-    ctx.beginPath(); ctx.arc(L * 0.23, -L * 0.16, 1, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.rape(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.6; }
 }
@@ -2373,63 +1145,7 @@ class Vampiro {
     this.x = clamp(this.x, 40, world.W - 40);
     this.y = clamp(this.y, 100, world.floorY(this.x) - 40);
   }
-  draw(ctx) {
-    const R = this.r;
-    const t = world.time;
-    const k = this.scared; // 0 = paraguas abierto · 1 = envuelto en su capa
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // orejas (aletas)
-    ctx.fillStyle = '#5a2c36';
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(s * R * 0.7, -R * 0.75, R * 0.32, R * 0.16, s * (0.5 + Math.sin(t * 2 + this.seed) * 0.2), 0, TAU);
-      ctx.fill();
-    }
-    // manto
-    const g1 = ctx.createLinearGradient(0, -R, 0, R);
-    g1.addColorStop(0, '#6b3440');
-    g1.addColorStop(1, '#41202b');
-    ctx.beginPath();
-    ctx.ellipse(0, -R * 0.3, R * 0.85, R * 0.85, 0, Math.PI, 0);
-    ctx.quadraticCurveTo(R * 0.85, R * 0.2, R * 0.7, R * 0.3);
-    ctx.lineTo(-R * 0.7, R * 0.3);
-    ctx.quadraticCurveTo(-R * 0.85, R * 0.2, -R * 0.85, -R * 0.3);
-    ctx.closePath();
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // capa de brazos con membrana: se voltea al asustarse
-    const flip = 1 - 2 * k; // 1 abajo → -1 cubriéndose
-    ctx.fillStyle = k > 0.5 ? '#31161f' : '#4a2530';
-    ctx.beginPath();
-    ctx.moveTo(-R * 0.7, R * 0.28);
-    for (let i = 0; i <= 6; i++) {
-      const ax = lerp(-R * 0.7, R * 0.7, i / 6);
-      const sway = Math.sin(t * 2.2 + this.seed + i) * 2;
-      const tipY = R * 0.28 + (R * (0.75 + 0.15 * Math.sin(i * 2)) * flip) + sway * flip;
-      const midX = ax - R * 0.1;
-      if (i > 0) ctx.quadraticCurveTo(midX, tipY, ax, R * 0.28 + R * 0.4 * flip * 0.4);
-      else ctx.lineTo(ax, R * 0.28);
-    }
-    ctx.closePath();
-    ctx.fill();
-    // ojazos azules (los más grandes del reino animal, en proporción)
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const s of [-1, 1]) {
-      const gl = ctx.createRadialGradient(s * R * 0.34, -R * 0.28, 0, s * R * 0.34, -R * 0.28, R * 0.26);
-      gl.addColorStop(0, 'rgba(140, 220, 255, 0.9)');
-      gl.addColorStop(1, 'rgba(140, 220, 255, 0)');
-      ctx.fillStyle = gl;
-      ctx.beginPath(); ctx.arc(s * R * 0.34, -R * 0.28, R * 0.26, 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-    ctx.fillStyle = '#0a1420';
-    for (const s of [-1, 1]) {
-      ctx.beginPath(); ctx.arc(s * R * 0.34, -R * 0.28, R * 0.1, 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.vampiro(this, ctx); }
   head() { return { x: this.x, y: this.y - this.r * 0.4 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 10; }
 }
@@ -2468,55 +1184,7 @@ class Hacha {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 80, world.floorY(this.x) - 30);
   }
-  draw(ctx) {
-    const L = this.len;
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(dir, 1);
-    // colita fina
-    const flap = Math.sin(world.time * 10 + this.seed * 4);
-    ctx.strokeStyle = '#9fb4be';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.4, 0);
-    ctx.lineTo(-L * 0.75, flap * L * 0.14);
-    ctx.stroke();
-    // cuerpo de hacha: alto y comprimido
-    const g1 = ctx.createLinearGradient(0, -L * 0.5, 0, L * 0.5);
-    g1.addColorStop(0, '#c4d6de');
-    g1.addColorStop(0.6, '#eef6fa');
-    g1.addColorStop(1, '#8fa6b2');
-    ctx.beginPath();
-    ctx.moveTo(L * 0.45, -L * 0.1);
-    ctx.quadraticCurveTo(L * 0.2, -L * 0.55, -L * 0.15, -L * 0.3);
-    ctx.quadraticCurveTo(-L * 0.42, -L * 0.05, -L * 0.35, L * 0.15);
-    ctx.quadraticCurveTo(-L * 0.1, L * 0.52, L * 0.25, L * 0.35);
-    ctx.quadraticCurveTo(L * 0.48, L * 0.1, L * 0.45, -L * 0.1);
-    ctx.closePath();
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // fotóforos ventrales
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(150, 230, 255, 0.85)';
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath();
-      ctx.arc(-L * 0.25 + i * L * 0.13, L * 0.34 - Math.abs(i - 2) * L * 0.03, 1, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-    // ojo tubular mirando hacia arriba
-    ctx.fillStyle = '#f4fbff';
-    ctx.beginPath(); ctx.arc(L * 0.18, -L * 0.18, L * 0.13, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#0a1018';
-    ctx.beginPath(); ctx.arc(L * 0.18, -L * 0.26, L * 0.06, 0, TAU); ctx.fill();
-    // boca de preocupación
-    ctx.strokeStyle = 'rgba(70, 90, 100, 0.8)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(L * 0.42, L * 0.08, L * 0.06, Math.PI * 1.2, Math.PI * 1.9); ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.hacha(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.len * 0.7; }
 }
@@ -2569,145 +1237,14 @@ class Constelacion {
     }
     this.flash = Math.max(0, this.flash - dt * 0.5);
   }
-  draw(ctx) {
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.globalCompositeOperation = 'lighter';
-    // al parpadear, une sus propios puntos
-    if (this.flash > 0.02) {
-      ctx.strokeStyle = `rgba(180, 220, 255, ${0.35 * this.flash})`;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(this.pts[0].x, this.pts[0].y);
-      for (let i = 1; i < this.pts.length; i++) ctx.lineTo(this.pts[i].x, this.pts[i].y);
-      ctx.closePath();
-      ctx.stroke();
-    }
-    for (const p of this.pts) {
-      const tw = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 2.1 + p.ph));
-      const gl = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
-      gl.addColorStop(0, `rgba(235, 245, 255, ${0.9 * tw})`);
-      gl.addColorStop(0.4, `rgba(160, 210, 255, ${0.3 * tw})`);
-      gl.addColorStop(1, 'rgba(160, 210, 255, 0)');
-      ctx.fillStyle = gl;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 4, 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.constelacion(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 38; }
-}
-
-/* anguila pelícano: una boca con anguila detrás */
-function drawPelicano(fish, ctx, g) {
-  const { P, T } = g;
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#221826', '#141019');
-  ctx.fill();
-  // fotóforo rojo en la punta de la cola
-  const tail = P[P.length - 1];
-  const pulse = 0.6 + 0.4 * Math.sin(world.time * 3 + fish.seed);
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const gl = ctx.createRadialGradient(tail.x, tail.y, 0, tail.x, tail.y, 9 * pulse);
-  gl.addColorStop(0, `rgba(255, 120, 110, ${0.85 * pulse})`);
-  gl.addColorStop(1, 'rgba(255, 120, 110, 0)');
-  ctx.fillStyle = gl;
-  ctx.beginPath(); ctx.arc(tail.x, tail.y, 9 * pulse, 0, TAU); ctx.fill();
-  ctx.restore();
-  // la bocaza: bolsa de pelícano bajo la cabeza
-  const U = fish.up(g, 1);
-  const D = { x: -U.x, y: -U.y };
-  const gape = 0.55 + 0.35 * Math.sin(world.time * 0.9 + fish.seed);
-  const tip = { x: P[0].x + T[0].x * fish.widths[0] * 2.2, y: P[0].y + T[0].y * fish.widths[0] * 2.2 };
-  const back = P[3];
-  ctx.fillStyle = 'rgba(16, 10, 18, 0.95)';
-  ctx.beginPath();
-  ctx.moveTo(tip.x, tip.y);
-  ctx.quadraticCurveTo(
-    (tip.x + back.x) / 2 + D.x * fish.maxW * 5 * gape,
-    (tip.y + back.y) / 2 + D.y * fish.maxW * 5 * gape,
-    back.x + D.x * fish.widths[3], back.y + D.y * fish.widths[3]);
-  ctx.lineTo(P[1].x + D.x * fish.widths[1] * 0.4, P[1].y + D.y * fish.widths[1] * 0.4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(90, 60, 80, 0.5)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  // ojito perdido en tanta boca
-  ctx.fillStyle = '#b8d4e0';
-  ctx.beginPath(); ctx.arc(P[0].x + U.x * fish.widths[0] * 0.3, P[0].y + U.y * fish.widths[0] * 0.3, 1.4, 0, TAU); ctx.fill();
-}
-
-/* tiburón linterna: contrailuminación de bolsillo */
-function drawLinterna(fish, ctx, g) {
-  sharkFins(fish, ctx, g, '#221c1c');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#2b2422', '#453a35');
-  ctx.fill();
-  // fotóforos ventrales: borra su silueta desde abajo
-  const { P, R } = g;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 1; i < P.length - 2; i++) {
-    const tw = 0.5 + 0.5 * Math.sin(world.time * 2.4 + i * 0.8 + fish.seed);
-    ctx.fillStyle = `rgba(120, 220, 255, ${0.55 * tw})`;
-    ctx.beginPath();
-    ctx.arc(R[i].x, R[i].y, 1.1, 0, TAU);
-    ctx.fill();
-  }
-  // halo ventral suave
-  const h = fish.head();
-  const gl = ctx.createRadialGradient(h.x, h.y + fish.maxW, 0, h.x, h.y + fish.maxW, fish.len * 0.5);
-  gl.addColorStop(0, 'rgba(100, 200, 255, 0.08)');
-  gl.addColorStop(1, 'rgba(100, 200, 255, 0)');
-  ctx.fillStyle = gl;
-  ctx.fillRect(h.x - fish.len, h.y - fish.len * 0.4, fish.len * 2, fish.len);
-  ctx.restore();
-  sharkFace(fish, ctx, g, { teeth: false, eye: '#0f2418' });
-  // ojo verde brillante
-  const U = fish.up(g, 1);
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = 'rgba(140, 255, 190, 0.8)';
-  ctx.beginPath();
-  ctx.arc(g.P[1].x + U.x * fish.widths[1] * 0.32, g.P[1].y + U.y * fish.widths[1] * 0.32, fish.maxW * 0.14, 0, TAU);
-  ctx.fill();
-  ctx.restore();
-}
-
-/* tiburón carbón (ficticio): más oscuro que el agua que lo rodea */
-function drawCarbon(fish, ctx, g) {
-  sharkFins(fish, ctx, g, 'rgba(0, 2, 4, 0.95)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = 'rgba(0, 2, 4, 0.96)';
-  ctx.fill();
-  // un borde apenas insinuado, para saber que está
-  ctx.strokeStyle = 'rgba(97, 228, 255, 0.09)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  // el ojo: una brasa lejana
-  const U = fish.up(g, 1);
-  const ember = 0.5 + 0.3 * Math.sin(world.time * 1.1 + fish.seed);
-  ctx.fillStyle = `rgba(255, 90, 60, ${ember})`;
-  ctx.beginPath();
-  ctx.arc(g.P[1].x + U.x * fish.widths[1] * 0.3, g.P[1].y + U.y * fish.widths[1] * 0.3, 1.6, 0, TAU);
-  ctx.fill();
 }
 
 /* ============================================================
    EL NAUFRAGIO — especies (el barco de 1912)
    ============================================================ */
-
-/* congrio: el primo serio de la morena, custodio del casco */
-function drawCongrio(fish, ctx, g) {
-  eelDorsalRibbon(fish, ctx, g, 'rgba(140, 160, 165, 0.45)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#4e6068', '#aebcc0');
-  ctx.fill();
-  eelFace(fish, ctx, g, '#c8d8dc');
-}
 
 /* mero guasa: del tamaño de una nevera, con cara de ir a decirte algo */
 class Mero {
@@ -2735,62 +1272,7 @@ class Mero {
     this.y = world.floorY(this.x) - 84 + Math.sin(t * 0.5 + this.seed) * 9;
     this.vel.x = this.dir;
   }
-  draw(ctx) {
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.scale(this.dir, 1);
-    // cola redondeada
-    const flap = Math.sin(t * 2.6 + this.seed);
-    ctx.fillStyle = '#4e4232';
-    ctx.beginPath();
-    ctx.moveTo(-38, 0);
-    ctx.quadraticCurveTo(-54, flap * 5 - 16, -58, flap * 6);
-    ctx.quadraticCurveTo(-54, flap * 5 + 16, -38, 0);
-    ctx.closePath();
-    ctx.fill();
-    // aletas redondas
-    ctx.fillStyle = '#57493a';
-    ctx.beginPath();
-    ctx.ellipse(-6, -26, 15, 8, -0.5, 0, TAU);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(2, 22, 10, 6, 0.5 + Math.sin(t * 1.8 + this.seed) * 0.2, 0, TAU);
-    ctx.fill();
-    // cuerpo enorme
-    const g1 = ctx.createLinearGradient(0, -26, 0, 26);
-    g1.addColorStop(0, '#6b5a46');
-    g1.addColorStop(1, '#8f7c60');
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 44, 27, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // moteado
-    ctx.fillStyle = 'rgba(58, 46, 32, 0.45)';
-    for (let i = 0; i < 8; i++) {
-      const a = i * 2.4 + this.seed;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * 30, Math.sin(a * 1.3) * 16, 3.4, 0, TAU);
-      ctx.fill();
-    }
-    // bocaza con labios: siempre a punto de hablar
-    const gape = 0.3 + 0.18 * Math.sin(t * 0.7 + this.seed);
-    ctx.fillStyle = '#3a2e22';
-    ctx.beginPath();
-    ctx.ellipse(40, 6, 7, 9 * gape + 3, -0.2, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = '#2c2318';
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.arc(40, 2, 8, 0.5, Math.PI - 0.4);
-    ctx.stroke();
-    // ojo pequeño para tanto cuerpo
-    ctx.fillStyle = '#f0e8d8';
-    ctx.beginPath(); ctx.arc(28, -12, 3.6, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#191007';
-    ctx.beginPath(); ctx.arc(29, -12, 2, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.mero(this, ctx); }
   head() { return { x: this.x + this.dir * 34, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 52; }
 }
@@ -2828,38 +1310,7 @@ class Jurel {
     this.x += this.vel.x * dt;
     this.y += this.vel.y * dt;
   }
-  draw(ctx) {
-    const L = this.len;
-    const depth = Math.sin(this.ang); // −1 detrás · 1 delante
-    const s = 1 + depth * 0.16;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.globalAlpha *= 0.7 + 0.3 * (depth * 0.5 + 0.5);
-    ctx.rotate(Math.atan2(this.vel.y, this.vel.x));
-    ctx.scale(s, s);
-    const flap = Math.sin(world.time * 12 + this.seed * 7);
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.4, 0);
-    ctx.lineTo(-L * 0.78, flap * L * 0.24 - L * 0.2);
-    ctx.lineTo(-L * 0.78, flap * L * 0.24 + L * 0.2);
-    ctx.closePath();
-    ctx.fillStyle = '#d8c25a'; // cola amarilla de jurel
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(0, 0, L * 0.5, L * 0.2, 0, 0, TAU);
-    ctx.fillStyle = '#c2ced6';
-    ctx.fill();
-    // línea lateral oscura
-    ctx.strokeStyle = 'rgba(60, 75, 85, 0.6)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-L * 0.38, -L * 0.02);
-    ctx.quadraticCurveTo(0, L * 0.06, L * 0.42, -L * 0.02);
-    ctx.stroke();
-    ctx.beginPath(); ctx.arc(L * 0.3, -L * 0.03, 1.4, 0, TAU);
-    ctx.fillStyle = '#0a1018'; ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.jureles(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 15; }
 }
@@ -2894,49 +1345,7 @@ class Dumbo {
     this.y += this.vel.y * dt;
     this.y = clamp(this.y, 100, world.floorY(this.x) - 30);
   }
-  draw(ctx) {
-    const R = this.r;
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // orejas aleteando: su forma de nadar
-    const flapL = Math.sin(t * 3.1 + this.seed);
-    const flapR = Math.sin(t * 3.1 + this.seed + 0.6);
-    ctx.fillStyle = '#c98fa4';
-    ctx.beginPath();
-    ctx.ellipse(-R * 0.75, -R * 0.55, R * 0.42, R * 0.2, -0.7 + flapL * 0.4, 0, TAU);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(R * 0.75, -R * 0.55, R * 0.42, R * 0.2, 0.7 - flapR * 0.4, 0, TAU);
-    ctx.fill();
-    // manto redondito
-    const g1 = ctx.createLinearGradient(0, -R, 0, R);
-    g1.addColorStop(0, '#dfa8ba');
-    g1.addColorStop(1, '#b57d92');
-    ctx.beginPath();
-    ctx.ellipse(0, -R * 0.1, R * 0.9, R * 0.85, 0, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    // faldita de brazos con membrana
-    ctx.fillStyle = '#a86e84';
-    ctx.beginPath();
-    ctx.moveTo(-R * 0.8, R * 0.3);
-    for (let i = 0; i <= 5; i++) {
-      const ax = lerp(-R * 0.8, R * 0.8, i / 5);
-      const sway = Math.sin(t * 2 + this.seed + i * 1.2) * 2;
-      ctx.quadraticCurveTo(ax - R * 0.12, R * 0.85 + sway, ax, R * 0.55);
-    }
-    ctx.closePath();
-    ctx.fill();
-    // ojazos amables
-    for (const s of [-1, 1]) {
-      ctx.fillStyle = '#fbf4f6';
-      ctx.beginPath(); ctx.arc(s * R * 0.34, -R * 0.15, R * 0.2, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#241820';
-      ctx.beginPath(); ctx.arc(s * R * 0.34, -R * 0.12, R * 0.1, 0, TAU); ctx.fill();
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.dumbo(this, ctx); }
   head() { return { x: this.x, y: this.y - this.r * 0.4 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < this.r + 10; }
 }
@@ -2968,41 +1377,7 @@ class Vigia {
     }
     this.blink = Math.max(0, this.blink - dt * 5);
   }
-  draw(ctx) {
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y + Math.sin(t * 0.9 + this.seed) * 1.2);
-    // cuerpecillo asomado de la cofa
-    ctx.fillStyle = '#3c4a44';
-    ctx.beginPath();
-    ctx.ellipse(0, 4, 11, 9, 0, Math.PI, 0);
-    ctx.fill();
-    // EL ojo
-    const er = 8;
-    const blinkK = 1 - Math.min(1, this.blink * 1.6); // 1 abierto → 0 cerrado
-    ctx.fillStyle = '#e8f2ea';
-    ctx.beginPath();
-    ctx.ellipse(0, -2, er, er * Math.max(0.08, blinkK), 0, 0, TAU);
-    ctx.fill();
-    if (blinkK > 0.25) {
-      // el iris sigue al visitante, siempre
-      const m = world.mouse;
-      const d = norm((m.active ? m.x : this.x + 40) - this.x, (m.active ? m.y : this.y) - this.y);
-      const px = d.x * 3.2, py = d.y * 2.2 * blinkK;
-      ctx.fillStyle = '#5c8a72';
-      ctx.beginPath(); ctx.arc(px, -2 + py, 4 * blinkK + 0.5, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#101a14';
-      ctx.beginPath(); ctx.arc(px, -2 + py, 2 * blinkK + 0.3, 0, TAU); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.beginPath(); ctx.arc(px - 1, -3.4, 0.9, 0, TAU); ctx.fill();
-    }
-    ctx.strokeStyle = '#2c3a32';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(0, -2, er, er * Math.max(0.08, blinkK), 0, 0, TAU);
-    ctx.stroke();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.vigia(this, ctx); }
   head() { return { x: this.x, y: this.y - 4 }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 20; }
 }
@@ -3058,53 +1433,7 @@ class Moneda {
       });
     }
   }
-  draw(ctx) {
-    const t = world.time;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.shine > 0.02) {
-      const gs = ctx.createRadialGradient(0, 0, 1, 0, 0, 16);
-      gs.addColorStop(0, `rgba(255, 232, 150, ${0.55 * this.shine})`);
-      gs.addColorStop(1, 'rgba(255, 232, 150, 0)');
-      ctx.fillStyle = gs;
-      ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
-    }
-    // colita
-    const flap = Math.sin(t * 11 + this.seed * 5);
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.fillStyle = '#b8923a';
-    ctx.beginPath();
-    ctx.moveTo(-dir * 4.5, 0);
-    ctx.lineTo(-dir * 8.5, flap * 2 - 2.6);
-    ctx.lineTo(-dir * 8.5, flap * 2 + 2.6);
-    ctx.closePath();
-    ctx.fill();
-    // el disco
-    const g1 = ctx.createLinearGradient(-5, -5, 5, 5);
-    g1.addColorStop(0, '#f2d270');
-    g1.addColorStop(1, '#a8842a');
-    ctx.beginPath();
-    ctx.arc(0, 0, 5.4, 0, TAU);
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = '#7c5e1c';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // acuñado: un pececito grabado
-    ctx.strokeStyle = 'rgba(124, 94, 28, 0.8)';
-    ctx.beginPath(); ctx.arc(0, 0, 3.4, 0.5, 2.4); ctx.stroke();
-    // reflejo que gira
-    const sw = (t * 1.4 + this.seed) % TAU;
-    ctx.strokeStyle = 'rgba(255, 240, 190, 0.85)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, 4.4, sw, sw + 0.9);
-    ctx.stroke();
-    // ojito
-    ctx.fillStyle = '#3c2c0c';
-    ctx.beginPath(); ctx.arc(dir * 2.2, -1, 0.9, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.moneda(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 10; }
 }
@@ -3139,71 +1468,7 @@ class MedusaBronce {
     if (this.y < 110) this.y = world.floorY(this.x) - 70;
     this.ring = Math.max(0, this.ring - dt * 0.55);
   }
-  draw(ctx) {
-    const t = world.time;
-    const s = Math.sin(this.pulse);
-    const R = 15;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.ring > 0) ctx.rotate(Math.sin(t * 26) * 0.08 * this.ring);
-    // la onda de la campanada
-    if (this.ring > 0.02) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = `rgba(230, 200, 130, ${0.4 * this.ring})`;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(0, 4, (1 - this.ring) * 130 + 14, 0, TAU);
-      ctx.stroke();
-      ctx.restore();
-    }
-    // tentáculos finos
-    ctx.strokeStyle = 'rgba(160, 140, 90, 0.5)';
-    ctx.lineWidth = 1.1;
-    for (let i = -1; i <= 1; i++) {
-      const sway = Math.sin(t * 1.4 + this.seed + i) * 7;
-      ctx.beginPath();
-      ctx.moveTo(i * R * 0.4, R * 0.75);
-      ctx.quadraticCurveTo(i * R * 0.4 + sway * 0.5, R * 1.6, i * R * 0.4 + sway, R * 2.3);
-      ctx.stroke();
-    }
-    // campana de bronce (con hombros y boca acampanada)
-    const g1 = ctx.createLinearGradient(-R, -R, R, R * 0.8);
-    g1.addColorStop(0, '#b08b46');
-    g1.addColorStop(0.55, '#7c5f2e');
-    g1.addColorStop(1, '#54401e');
-    ctx.beginPath();
-    ctx.moveTo(0, -R * (1 + 0.08 * s));
-    ctx.quadraticCurveTo(R * 0.85, -R * 0.75, R * 0.62, R * 0.3);
-    ctx.quadraticCurveTo(R * 0.62, R * 0.6, R * 0.95, R * 0.78);
-    ctx.lineTo(-R * 0.95, R * 0.78);
-    ctx.quadraticCurveTo(-R * 0.62, R * 0.6, -R * 0.62, R * 0.3);
-    ctx.quadraticCurveTo(-R * 0.85, -R * 0.75, 0, -R * (1 + 0.08 * s));
-    ctx.closePath();
-    ctx.fillStyle = g1;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(60, 45, 20, 0.7)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    // verdín
-    ctx.fillStyle = 'rgba(96, 150, 118, 0.35)';
-    ctx.beginPath();
-    ctx.ellipse(-R * 0.3, -R * 0.2, R * 0.28, R * 0.4, 0.5, 0, TAU);
-    ctx.fill();
-    // el badajo, que también es su ojo
-    const swing = Math.sin(t * (this.ring > 0 ? 14 : 1.6) + this.seed) * (3 + this.ring * 5);
-    ctx.strokeStyle = '#4c3a1c';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(0, R * 0.2);
-    ctx.lineTo(swing, R * 0.95);
-    ctx.stroke();
-    ctx.fillStyle = '#e8d8a8';
-    ctx.beginPath(); ctx.arc(swing, R * 0.98, 2.6, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#241c08';
-    ctx.beginPath(); ctx.arc(swing, R * 0.98, 1.2, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.campana(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 22; }
 }
@@ -3281,40 +1546,7 @@ class PezSemilla {
       }
     }
   }
-  draw(ctx) {
-    const t = world.time;
-    const dir = this.vel.x >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    if (this.fase !== 'nada') ctx.rotate(dir * lerp(0, Math.PI / 2, Math.min(1, this.entierro + (this.fase === 'baja' ? 0.3 : 0))));
-    // cuerpo: una pipa con planes
-    const g1 = ctx.createLinearGradient(0, -6, 0, 6);
-    g1.addColorStop(0, '#d8b06a');
-    g1.addColorStop(1, '#8a6432');
-    ctx.fillStyle = g1;
-    ctx.beginPath();
-    ctx.moveTo(dir * 7, 0);
-    ctx.quadraticCurveTo(dir * 2, -5.5, -dir * 6, -1.5);
-    ctx.quadraticCurveTo(-dir * 8, 0, -dir * 6, 1.5);
-    ctx.quadraticCurveTo(dir * 2, 5.5, dir * 7, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(70, 48, 20, 0.5)';
-    ctx.lineWidth = 0.8;
-    ctx.stroke();
-    // el brote dorsal: dos hojitas que ya no disimulan
-    const sway = Math.sin(t * 2.2 + this.seed) * 0.25;
-    ctx.fillStyle = 'rgba(150, 214, 160, 0.9)';
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.ellipse(-dir * 1 + s * 2.4, -6.5, 2.2, 4, sway + s * 0.65, 0, TAU);
-      ctx.fill();
-    }
-    // ojito decidido
-    ctx.fillStyle = '#2c1e08';
-    ctx.beginPath(); ctx.arc(dir * 4, -1, 1, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.semilla(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 12; }
 }
@@ -3335,43 +1567,6 @@ function raizBehavior(fish, f) {
   if (best) f.x += Math.sign(best.x - fish.x) * 0.6;
 }
 
-function drawRaiz(fish, ctx, g) {
-  const { P } = g;
-  // raicillas que tantean la arena
-  ctx.strokeStyle = 'rgba(120, 88, 96, 0.55)';
-  ctx.lineWidth = 1.2;
-  ctx.lineCap = 'round';
-  for (let i = 4; i < P.length - 3; i += 4) {
-    const U = fish.up(g, i);
-    const w = fish.widths[i];
-    const sway = Math.sin(world.time * 0.8 + i * 1.7) * 2;
-    ctx.beginPath();
-    ctx.moveTo(P[i].x - U.x * w * 0.7, P[i].y - U.y * w * 0.7);
-    ctx.quadraticCurveTo(P[i].x - U.x * (w + 4), P[i].y - U.y * (w + 4) + 3,
-                         P[i].x - U.x * (w + 8) + sway, P[i].y - U.y * (w + 8) + 7);
-    ctx.stroke();
-  }
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#54404c', '#a8889c');
-  ctx.fill();
-  // nudos de madera a lo largo del lomo
-  ctx.fillStyle = 'rgba(52, 36, 44, 0.55)';
-  for (let i = 5; i < P.length - 4; i += 6) {
-    ctx.beginPath();
-    ctx.arc(P[i].x, P[i].y, Math.max(1, fish.widths[i] * 0.3), 0, TAU);
-    ctx.fill();
-  }
-  // un brote en la frente: la raíz también quiere su flor
-  const U0 = fish.up(g, 1);
-  const bx = P[1].x + U0.x * (fish.widths[1] + 2);
-  const by = P[1].y + U0.y * (fish.widths[1] + 2);
-  ctx.fillStyle = 'rgba(238, 172, 210, 0.9)';
-  ctx.beginPath();
-  ctx.ellipse(bx, by, 2.2, 3.6, Math.atan2(U0.x, -U0.y), 0, TAU);
-  ctx.fill();
-  eelFace(fish, ctx, g, '#ead8e4');
-}
-
 /* tiburón flor: aletas de pétalo que muda al nadar */
 function florBehavior(fish, f, dt) {
   // pasea sobre el jardín, nunca demasiado bajo
@@ -3386,31 +1581,6 @@ function florBehavior(fish, f, dt) {
       life: rand(1.4, 2.8), age: 0, hue: rand(310, 345),
     });
   }
-}
-
-function drawFlor(fish, ctx, g) {
-  const { P } = g;
-  sharkFins(fish, ctx, g, 'rgba(238, 160, 198, 0.85)');
-  fish.bodyPath(ctx, g);
-  ctx.fillStyle = fish.bodyGradient(ctx, '#b46088', '#f2cade');
-  ctx.fill();
-  // la corola dorsal: pétalos donde otros llevan aleta
-  const di = 5;
-  const U = fish.up(g, di);
-  const cx = P[di].x + U.x * fish.widths[di] * 0.9;
-  const cy = P[di].y + U.y * fish.widths[di] * 0.9;
-  const base = Math.atan2(U.y, U.x);
-  for (let k = -2; k <= 2; k++) {
-    const a = base + k * 0.42 + Math.sin(world.time * 1.1 + fish.seed + k) * 0.06;
-    ctx.fillStyle = `hsla(${325 + k * 8}, 70%, ${74 - Math.abs(k) * 6}%, 0.9)`;
-    ctx.beginPath();
-    ctx.ellipse(cx + Math.cos(a) * fish.maxW * 0.9, cy + Math.sin(a) * fish.maxW * 0.9,
-                fish.maxW * 0.7, fish.maxW * 0.3, a, 0, TAU);
-    ctx.fill();
-  }
-  ctx.fillStyle = '#ffe8a0';
-  ctx.beginPath(); ctx.arc(cx, cy, fish.maxW * 0.22, 0, TAU); ctx.fill();
-  sharkFace(fish, ctx, g, { eye: '#3a1e30', gill: 'rgba(120, 50, 90, 0.4)', mouth: 'rgba(90, 30, 60, 0.6)' });
 }
 
 /* pez colibrí: liba las flores-coral sin posarse jamás */
@@ -3464,53 +1634,7 @@ class PezColibri {
       });
     }
   }
-  draw(ctx) {
-    const t = world.time;
-    const dir = (this.tx - this.x) >= 0 ? 1 : -1;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // alas-aleta: un borrón de tanto batir
-    ctx.globalAlpha *= 0.55;
-    ctx.fillStyle = '#cfe8f0';
-    for (const ph of [0, 2.1, 4.2]) {
-      const a = Math.sin(t * 26 + ph) * 0.9;
-      ctx.beginPath();
-      ctx.ellipse(-dir * 1, -3, 8, 2.6, a * 0.6 - dir * 0.4, 0, TAU);
-      ctx.fill();
-    }
-    ctx.globalAlpha /= 0.55;
-    // cuerpo tornasolado
-    const g1 = ctx.createLinearGradient(0, -5, 0, 6);
-    g1.addColorStop(0, '#5ad0a8');
-    g1.addColorStop(0.6, '#3a9a90');
-    g1.addColorStop(1, '#e478a8');
-    ctx.fillStyle = g1;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 7.5, 5, 0, 0, TAU);
-    ctx.fill();
-    // cola timón
-    const flap = Math.sin(t * 12 + this.seed) * 2;
-    ctx.fillStyle = 'rgba(90, 208, 168, 0.8)';
-    ctx.beginPath();
-    ctx.moveTo(-dir * 6, 0);
-    ctx.lineTo(-dir * 13, flap - 4);
-    ctx.lineTo(-dir * 13, flap + 4);
-    ctx.closePath();
-    ctx.fill();
-    // pico-hocico para libar
-    ctx.strokeStyle = '#e8d090';
-    ctx.lineWidth = 1.6;
-    ctx.lineCap = 'round';
-    const tilt = this.sip * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(dir * 6, -1);
-    ctx.lineTo(dir * 15, -1 + tilt * 6);
-    ctx.stroke();
-    // ojo
-    ctx.fillStyle = '#10241c';
-    ctx.beginPath(); ctx.arc(dir * 3.4, -1.6, 1.2, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.colibri(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return dist(mx, my, this.x, this.y) < 14; }
 }
@@ -3559,40 +1683,7 @@ class MedusaDiente {
     if (this.x < 50) this.x = 50;
     if (this.x > world.W - 50) this.x = world.W - 50;
   }
-  draw(ctx) {
-    const t = world.time;
-    const s = this.scatter;
-    const ease = s * s * (3 - 2 * s); // los vilanos salen y vuelven con calma
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    // núcleo: se queda esperando a que todos vuelvan
-    ctx.fillStyle = `rgba(238, 228, 190, ${0.85 - ease * 0.5})`;
-    ctx.beginPath(); ctx.arc(0, 0, 4.4 - ease * 1.5, 0, TAU); ctx.fill();
-    // vilanos
-    for (const f of this.fil) {
-      const a = f.a + Math.sin(t * 0.8 + f.a * 3 + this.seed) * 0.05 + ease * f.spin;
-      const bx = Math.cos(a) * f.len + f.dx * ease;
-      const by = Math.sin(a) * f.len + f.dy * ease;
-      ctx.strokeStyle = `rgba(240, 234, 210, ${0.5 - ease * 0.25})`;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 4 * (1 - ease), Math.sin(a) * 4 * (1 - ease));
-      ctx.lineTo(bx, by);
-      ctx.stroke();
-      // el penacho
-      ctx.fillStyle = `rgba(250, 246, 228, ${0.8 - ease * 0.3})`;
-      ctx.beginPath(); ctx.arc(bx, by, 1.5, 0, TAU); ctx.fill();
-      for (let k = 0; k < 3; k++) {
-        const pa = a + (k - 1) * 0.5;
-        ctx.strokeStyle = `rgba(250, 246, 228, ${0.35 - ease * 0.15})`;
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx + Math.cos(pa) * 4, by + Math.sin(pa) * 4);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-  }
+  draw(ctx) { PINTAR.diente(this, ctx); }
   head() { return { x: this.x, y: this.y }; }
   hit(mx, my) { return this.scatter < 0.3 && dist(mx, my, this.x, this.y) < 24; }
 }
