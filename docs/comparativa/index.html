@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acuario Abisal — antes y ahora</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --fondo: #03131f;
+    --vidrio: rgba(3, 25, 38, 0.72);
+    --tinta: #f3fafa;
+    --tenue: #c0d6da;
+    --cian: #a5e8e4;
+    --ambar: #f3d09c;
+    --linea: rgba(214, 244, 242, 0.17);
+    --serif: "Fraunces", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: var(--serif);
+    font-weight: 330;
+    line-height: 1.55;
+    padding: 0 16px 80px;
+  }
+  main { max-width: 1180px; margin: 0 auto; }
+  header { padding: 72px 0 40px; text-align: center; }
+  .marca { font-family: var(--mono); font-size: 12px; letter-spacing: 0.3em; color: var(--ambar); }
+  h1 { font-weight: 300; font-size: clamp(36px, 7vw, 72px); line-height: 1.05; margin: 14px 0 18px; }
+  h1 em { color: var(--cian); }
+  .intro { max-width: 640px; margin: 0 auto; font-size: 18px; color: var(--tenue); }
+  nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 28px; }
+  nav a {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em;
+    color: var(--tinta); text-decoration: none;
+    padding: 8px 14px; border: 1px solid var(--linea); border-radius: 18px;
+  }
+  nav a:hover, nav a:focus-visible { background: rgba(170, 230, 226, 0.13); outline: none; }
+
+  h2 { font-weight: 330; font-style: italic; font-size: 30px; margin: 64px 0 6px; }
+  h2 + p { color: var(--tenue); margin-bottom: 26px; max-width: 760px; }
+
+  .toma { margin: 0 0 54px; }
+  .toma h3 { font-weight: 420; font-size: 21px; }
+  .toma p { color: var(--tenue); font-size: 16px; margin: 4px 0 14px; max-width: 820px; }
+
+  /* deslizador: «ahora» encima, recortado por la izquierda */
+  .comparar {
+    position: relative;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid var(--linea);
+    background: #000;
+    --x: 50%;
+    user-select: none;
+    touch-action: pan-y;
+  }
+  .comparar.estrecha { max-width: 420px; margin-inline: auto; }
+  .comparar img { display: block; width: 100%; height: auto; }
+  .comparar .ahora { position: absolute; inset: 0; clip-path: inset(0 0 0 var(--x)); }
+  .comparar .raya {
+    position: absolute; top: 0; bottom: 0; left: var(--x);
+    width: 2px; margin-left: -1px; background: var(--tinta);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.5); pointer-events: none;
+  }
+  .comparar .raya::after {
+    content: "◂ ▸"; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--mono); font-size: 12px; white-space: nowrap;
+    padding: 8px 10px; border-radius: 16px; background: var(--vidrio); color: var(--tinta);
+    border: 1px solid var(--linea);
+  }
+  /* las etiquetas van fuera de la imagen: dentro tapaban el HUD de la captura */
+  .lados {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em;
+    margin-bottom: 6px; padding: 0 4px;
+  }
+  .lados .a { color: var(--tenue); }
+  .lados .b { color: var(--cian); }
+  .estrecha-lados { max-width: 420px; margin-inline: auto; }
+  .comparar input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: ew-resize; margin: 0;
+  }
+  .comparar:focus-within { outline: 2px solid var(--cian); outline-offset: 3px; }
+  .enlaces { font-family: var(--mono); font-size: 12px; margin-top: 8px; color: var(--tenue); }
+  .enlaces a { color: var(--cian); }
+
+  .momentos { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 18px; }
+  figure { border: 1px solid var(--linea); border-radius: 18px; overflow: hidden; background: rgba(4, 28, 42, 0.6); }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 12px 16px 16px; }
+  figcaption b { display: block; font-weight: 420; font-size: 18px; }
+  figcaption span { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--tenue); }
+  figcaption p { font-size: 15px; color: var(--tenue); margin-top: 6px; }
+  .album { display: grid; grid-template-columns: 3fr 1fr; gap: 18px; align-items: start; }
+
+  ul.datos { list-style: none; display: grid; gap: 10px; max-width: 820px; }
+  ul.datos li { padding: 12px 16px; border: 1px solid var(--linea); border-radius: 16px; }
+  ul.datos b { font-weight: 500; color: var(--cian); }
+  footer { margin-top: 60px; font-family: var(--mono); font-size: 12px; color: var(--tenue); text-align: center; }
+
+  @media (max-width: 700px) {
+    header { padding-top: 40px; }
+    .album { grid-template-columns: 1fr; }
+    .momentos { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="marca">RAMA graficos-descanso</p>
+    <h1>Acuario <em>Abisal</em>,<br>antes y ahora</h1>
+    <p class="intro">El mismo juego, con la misma partida, el mismo instante y las criaturas en la misma posición. Arrastra la línea de cada imagen para comparar. Al final, los diez momentos nuevos para observar.</p>
+    <nav>
+      <a href="#ecosistemas">Ecosistemas</a>
+      <a href="#interfaz">Interfaz</a>
+      <a href="#movil">Móvil</a>
+      <a href="#especies">Las 44 especies</a>
+      <a href="#vuelta">La media vuelta</a>
+      <a href="#momentos">Momentos</a>
+      <a href="#medido">Lo medido</a>
+    </nav>
+  </header>
+
+  <h2 id="ecosistemas">Los cinco ecosistemas</h2>
+  <p>El agua ahora tiene superficie, luz que entra y respira en ciclos de unos diez segundos, y distancia: cada bioma tiene sus propios planos lejanos y su clima.</p>
+  <div data-grupo="ecosistemas"></div>
+
+  <h2 id="interfaz">Interfaz</h2>
+  <p>La interfaz se aparta: una sola línea arriba, el cebo abajo, vidrio en lugar de cajas opacas y ningún texto por debajo de 11 px.</p>
+  <div data-grupo="interfaz"></div>
+
+  <h2 id="movil">Móvil</h2>
+  <p>A 390 px el selector de bioma se salía de la pantalla. Ahora todo cabe, también a 320 px, y los cebos son botones del tamaño de un dedo.</p>
+  <div data-grupo="movil"></div>
+
+  <h2 id="especies">Las 44 especies</h2>
+  <p>Todas redibujadas: siluetas reales, volumen que sigue la curva del cuerpo, contrasombra, aletas con radios y ojos a escala. Las especies ficticias conservan su luz propia.</p>
+  <div data-grupo="especies"></div>
+
+  <h2 id="vuelta">La media vuelta</h2>
+  <p>Antes, al cambiar de sentido, el dibujo se estrechaba hasta una línea y se abría del revés, como un naipe. Ahora la cabeza gira primero y viene hacia quien mira, el cuerpo se curva detrás y la cola llega la última. El costado que queda de canto tiene grosor y sombra, y las luces viajan con el cuerpo sin deformarse. En tiburones y anguilas la torsión baja de la cabeza a la cola en vez de rodar todo el cuerpo a la vez. El vídeo va a media velocidad.</p>
+  <figure><video src="giro/giro.mp4" autoplay muted loop playsinline style="display:block;width:100%;height:auto" aria-label="Payaso, pez espejo, rape y tortuga dando la vuelta: arriba antes, abajo ahora"></video></figure>
+  <h3 style="font-weight:420;font-size:21px;margin:28px 0 14px">Instante a instante</h3>
+  <figure><img src="giro/giro-tira.jpg" alt="Diez instantes de la vuelta de cuatro especies: antes se aplanan hasta una línea, ahora la cabeza gira primero y el cuerpo la sigue" loading="lazy"></figure>
+
+  <h2 id="momentos">Momentos para observar</h2>
+  <p>Diez escenas, dos por ecosistema, sacadas de lo que ya contaban las fichas del álbum. Unas ocurren solas si te quedas mirando y otras las provocas tú. Se completan fotografiándolas mientras ocurren y quedan en una pestaña nueva del álbum, con una pista para cada una.</p>
+  <div class="momentos" id="listaMomentos"></div>
+  <h3 style="font-weight:420;font-size:21px;margin:40px 0 14px">La pestaña Momentos del álbum</h3>
+  <div class="album">
+    <figure><img src="momentos/26-album-momentos.jpg" alt="Pestaña Momentos del álbum en escritorio: cuatro momentos fotografiados y seis con su pista" loading="lazy"></figure>
+    <figure><img src="momentos/27-album-momentos-movil.jpg" alt="Pestaña Momentos del álbum en el móvil" loading="lazy"></figure>
+  </div>
+
+  <h2 id="medido">Lo medido</h2>
+  <p>Comprobado con el navegador, jugando con ratón y teclado, en perfiles limpios.</p>
+  <ul class="datos">
+    <li><b>Rendimiento.</b> 60 fps en los cinco ecosistemas con la población máxima, a densidad de píxel 1 y 2, en un portátil con gráfica integrada en modo de ahorro de energía. Si un equipo no llega, la calidad baja sola antes que la suavidad.</li>
+    <li><b>Simulación intacta.</b> El comportamiento de las 44 especies (cada <code>update()</code>, constructor y dato del registro) es idéntico al de antes: solo cambió cómo se ven.</li>
+    <li><b>Giros.</b> Al dar la vuelta, el mayor salto entre dos fotogramas pasó de alrededor del 100 % del cambio a entre el 9 y el 33 %: ya no se voltean de golpe, y la vuelta con volumen mantiene los 60 fps aunque gire medio banco a la vez.</li>
+    <li><b>Partidas.</b> Una partida va de la versión antigua a la nueva y vuelve sin perder nada, momentos incluidos.</li>
+    <li><b>Arreglos.</b> Registrar con una foto no encendía la flecha de bioma. La flecha cerrada no decía cuánto faltaba. Al Abismo le entraba luz de sol. El visor salía desplazado al seguir a una criatura.</li>
+    <li><b>Navegadores.</b> Chrome y Firefox. Sin WebGL2 el agua se pinta con un plan B en 2D. Safari no se ha probado.</li>
+    <li><b>Pendiente de decidir.</b> Anguilas y tiburones se enroscan en bucle alrededor de un tercio del tiempo. Ya pasaba antes y viene de la simulación, que esta rama no toca.</li>
+  </ul>
+
+  <footer>Capturas generadas con <code>docs/comparativa/herramientas/</code> · mismo guion, reloj y azar para las dos versiones</footer>
+</main>
+
+<script>
+  const TOMAS = {
+    ecosistemas: [
+      ['02-arrecife', 'El Arrecife', 'Mañana turquesa: superficie con ondas, rayos que respiran, corales al fondo, kelp con hojas y cáusticas en la arena.'],
+      ['03-burbujeante', 'El Mar Burbujeante', 'Mediodía de champán: terrazas en la distancia, pradera que ondula y la colonia de anguilas jardín con volumen.'],
+      ['04-abismo', 'El Abismo', 'Ya no entra luz de sol (se colaba por un error). Noche estrellada, humo de las chimeneas y gusanos de tubo.'],
+      ['05-naufragio', 'El Naufragio', 'El barco por fin se ve: casco con óxido y algas, jarcias, ojos de buey que respiran y costillas de otros pecios al fondo.'],
+      ['06-imposible', 'El Jardín Imposible', 'Amanecer melocotón y lavanda, flores gigantes a lo lejos y una pradera con flores pequeñas.'],
+      ['07-arrecife-abisal', 'Modo abisal', 'Cada capa se funde con su versión nocturna, sin bordes que brillen.'],
+    ],
+    interfaz: [
+      ['01-inicio', 'Pantalla de inicio', 'El mar se ve a través: título ligero y tarjetas de vidrio en lugar de una cortina oscura.'],
+      ['08-ficha', 'Ficha de una criatura', 'Se lee como un cuaderno de campo: serif para el texto y datos sin letra de 7 px.'],
+      ['09-seguimiento', 'Seguir a una criatura', 'Al acompañarla, el fondo se mueve con paralaje y la escena gana profundidad.'],
+      ['10-camara', 'Modo cámara', 'Visor redondeado. Con zoom ya sale bajo el cursor (antes se desplazaba).'],
+      ['11-album', 'Álbum de la expedición', 'Cada retrato lleva el agua de su ecosistema. Pestaña nueva de Momentos.'],
+      ['12-bitacora', 'Bitácora', 'Panel de vidrio, nombres en serif y controles más grandes.'],
+    ],
+    movil: [
+      ['13-movil-inicio', 'Inicio en el móvil', '', true],
+      ['14-movil-juego', 'Juego en el móvil', 'Los botones de arriba quedan en iconos y el selector de bioma pasa a una segunda línea.', true],
+    ],
+    especies: [
+      ['15-especies', 'Lámina de especies', 'Los mismos retratos que usa el álbum.'],
+    ],
+  };
+
+  for (const [grupo, tomas] of Object.entries(TOMAS)) {
+    const caja = document.querySelector(`[data-grupo="${grupo}"]`);
+    for (const [id, titulo, texto, estrecha] of tomas) {
+      const el = document.createElement('section');
+      el.className = 'toma';
+      el.innerHTML = `
+        <h3></h3>
+        <p></p>
+        <div class="lados${estrecha ? ' estrecha-lados' : ''}"><span class="a">◂ ANTES</span><span class="b">AHORA ▸</span></div>
+        <div class="comparar${estrecha ? ' estrecha' : ''}">
+          <img src="antes/${id}.jpg" alt="" loading="lazy">
+          <img class="ahora" src="ahora/${id}.jpg" alt="" loading="lazy">
+          <span class="raya"></span>
+          <input type="range" min="0" max="100" value="50">
+        </div>
+        <div class="enlaces">ver <a href="antes/${id}.jpg">antes</a> · <a href="ahora/${id}.jpg">ahora</a> · <a href="pares/${id}.jpg">lado a lado</a></div>`;
+      el.querySelector('h3').textContent = titulo;
+      el.querySelector('p').textContent = texto;
+      const [a, b] = el.querySelectorAll('img');
+      a.alt = `${titulo}, antes`;
+      b.alt = `${titulo}, ahora`;
+      const rango = el.querySelector('input'), comp = el.querySelector('.comparar');
+      rango.setAttribute('aria-label', `Comparar ${titulo}: a la izquierda antes, a la derecha ahora`);
+      rango.addEventListener('input', () => comp.style.setProperty('--x', rango.value + '%'));
+      caja.append(el);
+    }
+  }
+
+  const MOMENTOS = [
+    ['16-momento-rastreo', 'El detector de metales', 'Arrecife · ocurre solo', 'El martillo barre la arena con su campo eléctrico y destapa a la raya enterrada.'],
+    ['17-momento-saludo', 'La cortesía de los faroles', 'Arrecife · lo provocas con luz', 'Dos faroluces se encuentran junto a la luz, bajan la intensidad y se inclinan.'],
+    ['18-momento-susto', 'La ola de timidez', 'Mar Burbujeante · ocurre solo', 'El pez globo se infla sobre la colonia y las anguilas jardín se esconden en ola, por orden de cercanía.'],
+    ['19-momento-baile', 'Coreografía para césped', 'Mar Burbujeante · lo provocas con plancton', 'Con el plancton encima, la colonia entera se mece a la vez.'],
+    ['20-momento-contraluz', 'El escondite vertical', 'Abismo · ocurre solo', 'El tiburón linterna se borra contra la luz que baja justo cuando el pez hacha mira hacia arriba.'],
+    ['21-momento-mapa', 'El mapa número 62', 'Abismo · lo provocas con luz', 'Las constelaciones se reúnen alrededor de la luz y unen sus puntos en un mapa.'],
+    ['22-momento-retumbo', 'Derecho de paso', 'Naufragio · ocurre solo', 'El mero retumba tres veces y el tornado de jureles le abre un pasillo.'],
+    ['23-momento-guardia', 'Cambio de guardia', 'Naufragio · lo provocas tocando la campana', 'Ocho campanadas y acude el barco entero, en corro.'],
+    ['24-momento-polinizacion', 'El depredador ápice, trabajando', 'Jardín Imposible · ocurre solo', 'El tiburón flor pasa rasante y cada flor se abre del todo a su paso.'],
+    ['25-momento-siembra', 'Pedir un deseo', 'Jardín Imposible · lo provocas tocando la medusa diente de león', 'Los vilanos que no vuelven caen a la arena y brota una flor donde cae cada uno.'],
+  ];
+  const lista = document.getElementById('listaMomentos');
+  for (const [id, nombre, donde, texto] of MOMENTOS) {
+    const f = document.createElement('figure');
+    f.innerHTML = `<img src="momentos/${id}.jpg" loading="lazy"><figcaption><b></b><span></span><p></p></figcaption>`;
+    f.querySelector('img').alt = nombre;
+    f.querySelector('b').textContent = nombre;
+    f.querySelector('span').textContent = donde;
+    f.querySelector('p').textContent = texto;
+    lista.append(f);
+  }
+</script>
+</body>
+</html>
