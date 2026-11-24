@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-"Acuario Abisal" — a contemplative discovery game: a procedurally-rendered 2D canvas aquarium where real and fictional species arrive, get observed, photographed (Pokémon Snap-style) and collected into an expedition album. Vanilla JavaScript, no build system, no dependencies, no tests. Code, comments and the source texts (UI strings, species and moment data) are written in Spanish; keep new code and comments in Spanish to match. The game ships bilingual and **English is the main, default version** (see *Languages* below). Tone references: thatgamecompany visuals (restful, luminous, never cartoon; no Splatoon), Katamari deadpan humor in album texts, and Pokémon Snap only as a *stance* (you are an observer; creatures relate to each other; some of your actions provoke unique moments), never its characters, art or names. Roadmap and status live in `ROADMAP.md`.
+"Acuario Abisal" — a contemplative discovery game: a procedurally-rendered 2D canvas aquarium where real and fictional species arrive, get observed, photographed (Pokémon Snap-style) and collected into an expedition album. Vanilla JavaScript, no build system, no dependencies, no tests. Code, comments and the source texts (UI strings, species and moment data) are written in Spanish; keep new code and comments in Spanish to match. The game ships bilingual and **English is the main, default version** (see *Languages* below). 
 
 ## Running
 
