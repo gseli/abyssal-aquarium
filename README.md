@@ -10,6 +10,10 @@ because you were there.
 
 There is no score, no timer and nothing to lose. It is meant to be left open.
 
+**Play it at <https://gseli.github.io/abyssal-aquarium/>**
+
+![The title Abyssal Aquarium over a sunlit reef](preview.jpg)
+
 ## Playing
 
 Pick a mode on the start screen:
